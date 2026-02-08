@@ -1,0 +1,79 @@
+<%- include('partials/header', { title: 'Shift Reports' }) %>
+<%
+  const formatDate = (d) => {
+    try {
+      return new Date(d).toLocaleDateString('en-US');
+    } catch (e) {
+      return d;
+    }
+  };
+%>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Shift report page</p>
+    <h2>Shift reports</h2>
+    <p class="muted">Click a report to view the full details.</p>
+  </div>
+</section>
+
+<section class="card">
+  <form method="GET" action="/admin/reports" class="filter-row">
+    <div class="form-group">
+      <label for="location_id">Location</label>
+      <select id="location_id" name="location_id">
+        <option value="">All locations</option>
+        <% locations.forEach(loc => { %>
+          <option value="<%= loc.id %>" <%= String(selectedLocation) === String(loc.id) ? 'selected' : '' %>><%= loc.name %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="valet_id">Valet</label>
+      <select id="valet_id" name="valet_id">
+        <option value="">All valets</option>
+        <% valets.forEach(valet => { %>
+          <option value="<%= valet.id %>" <%= String(selectedValet) === String(valet.id) ? 'selected' : '' %>><%= valet.name %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="sort">Sort by</label>
+      <select id="sort" name="sort">
+        <option value="recent" <%= sort === 'recent' ? 'selected' : '' %>>Most recent</option>
+        <option value="location" <%= sort === 'location' ? 'selected' : '' %>>Location</option>
+        <option value="valet" <%= sort === 'valet' ? 'selected' : '' %>>Valet</option>
+        <option value="cash" <%= sort === 'cash' ? 'selected' : '' %>>Cash</option>
+        <option value="digital" <%= sort === 'digital' ? 'selected' : '' %>>Digital</option>
+      </select>
+    </div>
+    <div class="filter-actions">
+      <button type="submit" class="btn btn-primary">Apply</button>
+      <a href="/admin/reports" class="btn btn-ghost">Reset</a>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <div class="report-header">
+    <span>Date</span>
+    <span>Location</span>
+    <span>Valet</span>
+    <span>Cash</span>
+    <span>Digital</span>
+  </div>
+  <div class="report-list">
+    <% if (reports.length === 0) { %>
+      <p class="muted">No reports match your filters.</p>
+    <% } %>
+    <% reports.forEach(report => { %>
+      <a class="report-row" href="/admin/reports/<%= report.id %>">
+        <span><%= formatDate(report.shift_date) %></span>
+        <span><%= report.location_name || 'Unassigned' %></span>
+        <span><%= report.valet_name %></span>
+        <span>$<%= Number(report.cash_tips || 0).toFixed(2) %></span>
+        <span>$<%= Number(report.online_tips || 0).toFixed(2) %></span>
+      </a>
+    <% }) %>
+  </div>
+</section>
+<%- include('partials/footer') %>

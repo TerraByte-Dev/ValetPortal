@@ -1,0 +1,56 @@
+<%- include('partials/header', { title: 'Manage Locations' }) %>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Location management</p>
+    <h2>Locations</h2>
+    <p class="muted">Removal requires typed confirmation.</p>
+  </div>
+</section>
+
+<section class="card">
+  <% if (error) { %>
+    <p class="alert alert-error"><%= error %></p>
+  <% } %>
+  <% if (message) { %>
+    <p class="alert alert-success"><%= message %></p>
+  <% } %>
+  <form action="/admin/locations" method="POST">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="locationName">Add new location</label>
+        <input type="text" id="locationName" name="locationName" required>
+      </div>
+      <div class="btn-row">
+        <button type="submit" class="btn btn-primary">Add location</button>
+      </div>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <h3>Existing locations</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% locations.forEach(loc => { %>
+          <tr>
+            <td><%= loc.name %></td>
+            <td>
+              <form action="/admin/locations/delete/<%= loc.id %>" method="POST" class="inline-form">
+                <input type="text" name="confirm_text" placeholder="Type DELETE" required>
+                <button type="submit" class="btn btn-danger">Remove</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+<%- include('partials/footer') %>

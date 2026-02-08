@@ -1,0 +1,28 @@
+<%- include('partials/header', { title: 'Analytics' }) %>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Analytics</p>
+    <h2>Performance analytics</h2>
+    <p class="muted">Dive into weekly performance and compare valets or locations.</p>
+  </div>
+  <div class="button-row">
+    <a href="/admin/charts" class="btn btn-primary">View charts</a>
+    <a href="/admin/charts-compare" class="btn btn-ghost">Compare valets</a>
+  </div>
+</section>
+
+<section class="stat-strip">
+  <div class="stat-card">
+    <p class="stat-label">Total shift reports</p>
+    <strong><%= reportCount %></strong>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Weekly exports</p>
+    <a href="/admin/export-weekly" class="btn btn-ghost">Download CSV</a>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">All reports</p>
+    <a href="/admin/reports" class="btn btn-ghost">Open reports</a>
+  </div>
+</section>
+<%- include('partials/footer') %>

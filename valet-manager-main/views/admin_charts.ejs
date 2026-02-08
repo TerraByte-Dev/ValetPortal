@@ -1,0 +1,71 @@
+<%- include('partials/header', { title: 'Charts' }) %>
+<div>
+  <h2>Valet Data Charts</h2>
+
+  <!-- Filter Form -->
+  <form action="/admin/charts" method="GET" style="margin-bottom:1em;">
+    <label for="location_id">Filter by Location:</label>
+    <select name="location_id" id="location_id" style="margin-right:1em;">
+      <option value="">All Locations</option>
+      <% locations.forEach(loc => { %>
+        <option value="<%= loc.id %>" <%= (selectedLocation == loc.id) ? 'selected' : '' %>><%= loc.name %></option>
+      <% }) %>
+    </select>
+
+    <label for="attribute">Attribute:</label>
+    <select name="attribute" id="attribute">
+      <option value="hours" <%= (selectedAttribute === 'hours') ? 'selected' : '' %>>Hours</option>
+      <option value="online_tips" <%= (selectedAttribute === 'online_tips') ? 'selected' : '' %>>Online Tips</option>
+      <option value="cash_tips" <%= (selectedAttribute === 'cash_tips') ? 'selected' : '' %>>Cash Tips</option>
+      <option value="total_tips" <%= (selectedAttribute === 'total_tips') ? 'selected' : '' %>>Total Tips</option>
+    </select>
+
+    <button type="submit" class="btn-dark" style="margin-left:1em;">Filter</button>
+  </form>
+
+  <!-- Chart Canvas -->
+  <canvas id="myChart" width="400" height="200"></canvas>
+
+  <br>
+  <a href="/admin" class="btn-dark">Back to Admin Portal</a>
+</div>
+
+<!-- Include Chart.js from a CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+  // The server passed 'labels' and 'dataValues' arrays
+  const labels = <%- JSON.stringify(labels) %>;
+  const dataValues = <%- JSON.stringify(dataValues) %>;
+
+  // Example: We'll display a line chart
+  const ctx = document.getElementById('myChart').getContext('2d');
+  const myChart = new Chart(ctx, {
+    type: 'line',  // or 'bar', 'pie', etc.
+    data: {
+      labels: labels,
+      datasets: [{
+        label: '<%= selectedAttribute %>',
+        data: dataValues,
+        backgroundColor: 'rgba(62,124,255, 0.2)',
+        borderColor: 'rgba(62,124,255, 1)',
+        borderWidth: 2,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: {
+          beginAtZero: true
+        }
+      }
+    }
+  });
+</script>
+<div class="button-row">
+    <a href="/admin/charts-compare" class="btn-dark">Compare Valets (Charts)</a>
+  </div>
+  
+
+<%- include('partials/footer') %>

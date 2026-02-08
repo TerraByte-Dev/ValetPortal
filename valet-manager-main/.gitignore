@@ -1,0 +1,14 @@
+# Node dependencies
+node_modules/
+
+# Environment files
+.env
+
+# Local databases (legacy)
+*.sqlite
+*.db
+
+# Uploads and build artifacts
+uploads/
+.DS_Store
+npm-debug.log*

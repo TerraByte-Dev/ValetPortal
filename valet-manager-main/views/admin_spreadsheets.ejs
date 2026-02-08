@@ -1,0 +1,12 @@
+<%- include('partials/header', { title: 'Spreadsheets' }) %>
+<div class="container">
+  <h2>Spreadsheets</h2>
+  <p>Select an export option:</p>
+  <div class="button-row">
+    <a href="/admin/export" class="btn-dark">Export All CSV</a>
+    <a href="/admin/export-weekly" class="btn-dark">Export Weekly CSV</a>
+  </div>
+  <br>
+  <a href="/admin" class="btn-dark">Back to Admin Portal</a>
+</div>
+<%- include('partials/footer') %>

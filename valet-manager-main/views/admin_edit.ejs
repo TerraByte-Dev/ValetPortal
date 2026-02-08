@@ -1,0 +1,47 @@
+<%- include('partials/header', { title: 'Edit Shift Report' }) %>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Shift report</p>
+    <h2>Edit report #<%= report.id %></h2>
+  </div>
+  <div class="button-row">
+    <a href="/admin/reports" class="btn btn-ghost">Back to reports</a>
+  </div>
+</section>
+
+<section class="card">
+  <form action="/admin/edit/<%= report.id %>" method="POST">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="shift_date">Shift date</label>
+        <input type="text" name="shift_date" id="shift_date" value="<%= report.shift_date %>" required>
+      </div>
+      <div class="form-group">
+        <label for="hours">Hours</label>
+        <input type="number" step="0.1" name="hours" id="hours" value="<%= report.hours %>" required>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="cars">Cars</label>
+        <input type="number" name="cars" id="cars" value="<%= report.cars %>" required>
+      </div>
+      <div class="form-group">
+        <label for="online_tips">Digital value</label>
+        <input type="number" step="0.01" name="online_tips" id="online_tips" value="<%= report.online_tips %>" required>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="cash_tips">Cash value</label>
+      <input type="number" step="0.01" name="cash_tips" id="cash_tips" value="<%= report.cash_tips %>" required>
+    </div>
+
+    <div class="btn-row">
+      <button type="submit" class="btn btn-primary">Save changes</button>
+      <a href="/admin/reports" class="btn btn-ghost">Cancel</a>
+    </div>
+  </form>
+</section>
+<%- include('partials/footer') %>

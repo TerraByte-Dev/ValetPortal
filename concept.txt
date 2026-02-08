@@ -1,0 +1,28 @@
+Author: TerraByte
+
+Brief Overview: A managerial portal for admins, a small community for valets, boosting productivity and tracking metrics, webapp designed for mobile viewing primarily. Valets submit shift reports, admins CAN, but that is through a Valet Submission page part of the dropdown navigation. For a lot of the IAM and infrastructure, fallback to default Microsoft Azure AD style.
+
+New users should register with { PHONE NUMBER, FIRST NAME + LAST INITIAL} Admins should also be able to create new user accounts in the admin portal. 
+Users login with phone number + password. 
+
+"Weekly/Week" in our project scope starts on monday morning 6AM. This gives sunday night shifts time to submit their reports.
+
+Pages (Basic, to be expanded on)
+	Landing (Login/Registration)
+	
+	AdminView
+		Clean navigation dropdown menu, standard IAM managerial control panel.Main page should highlight top valet for HOURS weekly and top valet for CASH+DIGITAL weekly, big buttons to guide towards Analytics + Shift Report Page (I think these are going to be most commonly accessed.) 
+		Analytics page, with customizable graphs to compare, view, and record data per our infrastructure.
+		Locations page, list of current locations, removal of Locations requires a "type-to-confirm" style confirmation. Add Location/Edit Location settings
+		Users page, list of all current users, removal of users requires a "type-to-confirm" style confirmation. Add Users/Edit users settings here.
+		Groups page, list of all current groups, removal of groups requires a "type-to-confirm" style confirmation. Add groups/Edit groups settings here. Groups are custom containers of employees, that might be be "Lead" or "Runner"
+		Shift Report Page, list of all shift reports, customizable viewing preferances (sort by location, sort by recent, sort by valet, etc.) Main page should be small, one line reports you can click to view the entire report, labeled as such. DATE (MM/DD/YYYY) LOCATION  VALET NAME  CASH   DIGITAL.
+		
+		
+		
+	ValetView
+		Shift report submission form
+			DATE MM/DD/YYYY, LOCATION, CASH VALUE, DIGITAL VALUE, (optional HOURS, up to 10 attached screenshots)
+		Simple editable profiles. (Custom profile pics, social links, contact info ALL OPTIONAL)
+		Private message/groupchat message system
+		

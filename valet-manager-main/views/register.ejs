@@ -1,0 +1,35 @@
+<%- include('partials/header', { title: 'Register' }) %>
+<section class="auth-shell">
+  <div class="auth-card">
+    <h2>Create account</h2>
+    <p class="muted">Register with your phone number and first name + last initial.</p>
+    <% if (error) { %>
+      <p class="alert alert-error"><%= error %></p>
+    <% } %>
+    <form action="/register" method="POST">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="first_name">First name</label>
+          <input type="text" id="first_name" name="first_name" placeholder="Alex" required>
+        </div>
+        <div class="form-group">
+          <label for="last_initial">Last initial</label>
+          <input type="text" id="last_initial" name="last_initial" maxlength="1" placeholder="T" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="phone">Phone number</label>
+        <input type="text" id="phone" name="phone" placeholder="(555) 123-4567" required>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required>
+      </div>
+      <div class="btn-row">
+        <button type="submit" class="btn btn-primary">Register</button>
+        <a href="/login" class="btn btn-ghost">Back to login</a>
+      </div>
+    </form>
+  </div>
+</section>
+<%- include('partials/footer') %>

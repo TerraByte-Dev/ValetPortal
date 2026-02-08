@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title || 'Valet Management Portal' %></title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <a href="/" class="brand-link">
+        <span class="brand-mark"></span>
+        <span class="brand-text">Valet Management Portal</span>
+      </a>
+    </div>
+    <div class="header-right">
+      <% if (user) { %>
+        <% function getInitials(fullName) {
+             if(!fullName) return '';
+             return fullName
+               .split(' ')
+               .map(word => word[0])
+               .join('')
+               .toUpperCase();
+           }
+        %>
+        <div class="user-chip">
+          <div class="avatar"><%= getInitials(user.name) %></div>
+          <div class="user-meta">
+            <span class="user-label">Signed in</span>
+            <strong><%= user.name %></strong>
+          </div>
+        </div>
+        <% if (user.role === 'admin') { %>
+          <details class="nav-dropdown">
+            <summary>Admin Menu</summary>
+            <div class="dropdown-panel">
+              <a href="/admin">Overview</a>
+              <a href="/admin/analytics">Analytics</a>
+              <a href="/admin/reports">Shift Reports</a>
+              <a href="/admin/valet-submission">Valet Submission</a>
+              <a href="/admin/locations">Locations</a>
+              <a href="/admin/users">Users</a>
+              <a href="/admin/groups">Groups</a>
+              <a href="/admin/leaderboard">Leaderboard</a>
+              <a href="/admin/charts">Charts</a>
+              <a href="/admin/charts-compare">Compare</a>
+              <a href="/admin/screenshots">Screenshots</a>
+            </div>
+          </details>
+        <% } else { %>
+          <nav class="inline-nav">
+            <a href="/dashboard">Shift Report</a>
+            <a href="/profile">Profile</a>
+            <a href="/messages">Messages</a>
+          </nav>
+        <% } %>
+        <a href="/logout" class="btn btn-ghost">Logout</a>
+      <% } else { %>
+        <nav class="inline-nav">
+          <a href="/login" class="btn btn-primary">Login</a>
+          <a href="/register" class="btn btn-ghost">Register</a>
+        </nav>
+      <% } %>
+    </div>
+  </header>
+  <main class="page">

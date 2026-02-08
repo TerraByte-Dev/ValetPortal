@@ -1,0 +1,25 @@
+<%- include('partials/header', { title: 'Login' }) %>
+<section class="auth-shell">
+  <div class="auth-card">
+    <h2>Sign in</h2>
+    <p class="muted">Use your phone number and password to access the portal.</p>
+    <% if (error) { %>
+      <p class="alert alert-error"><%= error %></p>
+    <% } %>
+    <form action="/login" method="POST">
+      <div class="form-group">
+        <label for="phone">Phone number</label>
+        <input type="text" id="phone" name="phone" placeholder="(555) 123-4567" required>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required>
+      </div>
+      <div class="btn-row">
+        <button type="submit" class="btn btn-primary">Login</button>
+        <a href="/register" class="btn btn-ghost">Create account</a>
+      </div>
+    </form>
+  </div>
+</section>
+<%- include('partials/footer') %>

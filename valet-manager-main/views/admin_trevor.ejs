@@ -1,0 +1,81 @@
+<%- include('partials/header', { title: 'Trevor Portal' }) %>
+<div>
+  <h2>Trevor Portal - Manager Notebook Style</h2>
+  <p><a href="/admin" class="btn-dark">Back to Admin Portal</a></p>
+
+  <% daysData.forEach(dayObj => { 
+       // Manually parse dayObj.day (YYYY-MM-DD) into a local date
+       let displayDate = dayObj.day;
+       try {
+         const [yyyy, mm, dd] = dayObj.day.split('-').map(Number);
+         const d = new Date(yyyy, mm - 1, dd);
+         // Get "Month Day, Year" (e.g., "March 5, 2025")
+         const dateString = d.toLocaleDateString('en-US', { 
+           year: 'numeric', 
+           month: 'long', 
+           day: 'numeric'
+         });
+         // Get the weekday (e.g., "Wednesday")
+         const weekdayString = d.toLocaleDateString('en-US', { weekday: 'long' });
+         // Combine them
+         displayDate = `${dateString} - ${weekdayString}`;
+       } catch(e) {
+         // fallback if parse fails
+         displayDate = dayObj.day;
+       }
+  %>
+    <!-- Display the combined date + weekday -->
+    <h3>Date: <%= displayDate %></h3>
+
+    <% dayObj.locations.forEach(locObj => { 
+         let totalHours = 0, totalCars = 0, totalOnline = 0, totalCash = 0;
+         locObj.shifts.forEach(shift => {
+           totalHours += Number(shift.hours) || 0;
+           totalCars += Number(shift.cars) || 0;
+           totalOnline += Number(shift.online_tips) || 0;
+           totalCash += Number(shift.cash_tips) || 0;
+         });
+         const totalTips = totalOnline + totalCash;
+    %>
+      <h4>Location: <%= locObj.location %></h4>
+      <table border="1" cellspacing="0" cellpadding="5" style="margin-bottom: 1em;">
+        <thead>
+          <tr>
+            <th>Valet Name</th>
+            <th>Hours</th>
+            <th>Cars</th>
+            <th>Online Tips</th>
+            <th>Cash Tips</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% locObj.shifts.forEach(shift => { 
+               const shiftTotal = Number(shift.online_tips) + Number(shift.cash_tips);
+          %>
+            <tr>
+              <td><%= shift.valet_name %></td>
+              <td><%= shift.hours %></td>
+              <td><%= shift.cars %></td>
+              <td><%= shift.online_tips %></td>
+              <td><%= shift.cash_tips %></td>
+              <td><%= shiftTotal %></td>
+            </tr>
+          <% }); %>
+          <tr style="font-weight: bold;">
+            <td>Location Totals:</td>
+            <td><%= totalHours %></td>
+            <td><%= totalCars %></td>
+            <td><%= totalOnline %></td>
+            <td><%= totalCash %></td>
+            <td><%= totalTips %></td>
+          </tr>
+        </tbody>
+      </table>
+    <% }); %>
+    <hr>
+  <% }); %>
+
+  <p><a href="/admin" class="btn-dark">Back to Admin Portal</a></p>
+</div>
+<%- include('partials/footer') %>

@@ -1,0 +1,81 @@
+<%- include('partials/header', { title: 'Compare Valets' }) %>
+<div>
+  <h2>Compare Valet Performance</h2>
+
+  <!-- Filter Form -->
+  <form action="/admin/charts-compare" method="GET" style="margin-bottom:1em;">
+    <!-- Location Filter -->
+    <label for="location_id">Location:</label>
+    <select name="location_id" id="location_id" style="margin-right:1em;">
+      <option value="">All Locations</option>
+      <% locations.forEach(loc => { %>
+        <option value="<%= loc.id %>" <%= (selectedLocation == loc.id) ? 'selected' : '' %>><%= loc.name %></option>
+      <% }) %>
+    </select>
+
+    <!-- Attribute Filter -->
+    <label for="attribute">Attribute:</label>
+    <select name="attribute" id="attribute" style="margin-right:1em;">
+      <option value="hours" <%= (selectedAttribute === 'hours') ? 'selected' : '' %>>Hours</option>
+      <option value="online_tips" <%= (selectedAttribute === 'online_tips') ? 'selected' : '' %>>Online Tips</option>
+      <option value="cash_tips" <%= (selectedAttribute === 'cash_tips') ? 'selected' : '' %>>Cash Tips</option>
+      <option value="total_tips" <%= (selectedAttribute === 'total_tips') ? 'selected' : '' %>>Total Tips</option>
+    </select>
+
+    <!-- Valet Filter -->
+    <label for="valet_id">Valet:</label>
+    <select name="valet_id" id="valet_id" style="margin-right:1em;">
+      <option value="all" <%= (selectedValet === 'all') ? 'selected' : '' %>>All Valets</option>
+      <% valets.forEach(v => { %>
+        <option value="<%= v.id %>" <%= (selectedValet == v.id) ? 'selected' : '' %>><%= v.name %></option>
+      <% }) %>
+    </select>
+
+    <button type="submit" class="btn-dark">Filter</button>
+  </form>
+
+  <!-- Chart Canvas -->
+  <canvas id="myChart" width="400" height="200"></canvas>
+
+  <br>
+  <a href="/admin" class="btn-dark">Back to Admin Portal</a>
+</div>
+
+<!-- Include Chart.js from a CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+  // The server passed 'labels' (array of dates) and 'datasets' (array of {label, data})
+  const labels = <%- JSON.stringify(labels) %>;
+  const datasets = <%- JSON.stringify(datasets) %>;
+
+  // We'll build out the Chart.js config
+  // For multiple valets, we'll have multiple line series
+  const dataConfig = {
+    labels: labels,
+    datasets: datasets.map(ds => ({
+      label: ds.label,
+      data: ds.data,
+      backgroundColor: 'rgba(62,124,255, 0.2)',
+      borderColor: 'rgba(62,124,255, 1)',
+      borderWidth: 2,
+      fill: false  // set to true if you want filled areas
+    }))
+  };
+
+  const ctx = document.getElementById('myChart').getContext('2d');
+  const myChart = new Chart(ctx, {
+    type: 'line', // or 'bar', etc.
+    data: dataConfig,
+    options: {
+      responsive: true,
+      scales: {
+        y: {
+          beginAtZero: true
+        }
+      }
+    }
+  });
+</script>
+
+<%- include('partials/footer') %>

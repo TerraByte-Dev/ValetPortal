@@ -1,0 +1,58 @@
+<%- include('partials/header', { title: 'All Online Payment Screenshots' }) %>
+<div>
+  <h2>All Online Payment Screenshots</h2>
+
+  <!-- Filter by location -->
+  <form action="/admin/screenshots" method="GET" style="margin-bottom:1em;">
+    <label for="location_id">Filter by Location:</label>
+    <select name="location_id" id="location_id">
+      <option value="">All Locations</option>
+      <% locations.forEach(loc => { %>
+        <option value="<%= loc.id %>" <%= (selectedLocation == loc.id) ? 'selected' : '' %>><%= loc.name %></option>
+      <% }) %>
+    </select>
+    <button type="submit" class="btn-dark">Filter</button>
+  </form>
+
+  <table border="1" cellspacing="0" cellpadding="5">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Location</th>
+        <th>Valet Name</th>
+        <th>Screenshots</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (reports.length === 0) { %>
+        <tr>
+          <td colspan="4">No screenshots found.</td>
+        </tr>
+      <% } else { %>
+        <% reports.forEach(rpt => { %>
+          <tr>
+            <td><%= rpt.shift_date %></td>
+            <td><%= rpt.location_name || 'N/A' %></td>
+            <td><%= rpt.valet_name %></td>
+            <td>
+              <% if (rpt.screenshots.length > 0) { %>
+                <div class="screenshots-container">
+                  <% rpt.screenshots.forEach(filePath => { %>
+                    <a href="/uploads/<%= filePath %>" target="_blank">
+                      <img src="/uploads/<%= filePath %>" style="width:50px; margin-right:5px;" />
+                    </a>
+                  <% }) %>
+                </div>
+              <% } else { %>
+                No screenshots
+              <% } %>
+            </td>
+          </tr>
+        <% }) %>
+      <% } %>
+    </tbody>
+  </table>
+
+  <a href="/admin" class="btn-dark">Back to Admin Portal</a>
+</div>
+<%- include('partials/footer') %>

@@ -1,0 +1,30 @@
+<%- include('partials/header', { title: 'Edit Group' }) %>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Group settings</p>
+    <h2>Edit group</h2>
+  </div>
+  <div class="button-row">
+    <a href="/admin/groups" class="btn btn-ghost">Back to groups</a>
+  </div>
+</section>
+
+<section class="card">
+  <% if (error) { %>
+    <p class="alert alert-error"><%= error %></p>
+  <% } %>
+  <form action="/admin/groups/edit/<%= group.id %>" method="POST">
+    <div class="form-group">
+      <label for="name">Group name</label>
+      <input type="text" id="name" name="name" value="<%= group.name %>" required>
+    </div>
+    <div class="form-group">
+      <label for="description">Description</label>
+      <input type="text" id="description" name="description" value="<%= group.description || '' %>">
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn btn-primary">Save changes</button>
+    </div>
+  </form>
+</section>
+<%- include('partials/footer') %>

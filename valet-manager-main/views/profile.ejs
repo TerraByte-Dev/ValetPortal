@@ -1,0 +1,57 @@
+<%- include('partials/header', { title: 'Profile' }) %>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Valet profile</p>
+    <h2>Edit profile</h2>
+    <p class="muted">All profile fields are optional.</p>
+  </div>
+</section>
+
+<section class="card">
+  <% if (error) { %>
+    <p class="alert alert-error"><%= error %></p>
+  <% } %>
+  <% if (message) { %>
+    <p class="alert alert-success"><%= message %></p>
+  <% } %>
+  <form action="/profile" method="POST">
+    <div class="form-group">
+      <label for="profile_photo_url">Profile photo URL</label>
+      <input type="text" id="profile_photo_url" name="profile_photo_url" value="<%= userProfile.profile_photo_url || '' %>" placeholder="https://">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="contact_email">Contact email</label>
+        <input type="email" id="contact_email" name="contact_email" value="<%= userProfile.contact_email || '' %>">
+      </div>
+      <div class="form-group">
+        <label for="contact_phone">Contact phone</label>
+        <input type="text" id="contact_phone" name="contact_phone" value="<%= userProfile.contact_phone || '' %>">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="social_instagram">Instagram</label>
+        <input type="text" id="social_instagram" name="social_instagram" value="<%= userProfile.social_instagram || '' %>">
+      </div>
+      <div class="form-group">
+        <label for="social_linkedin">LinkedIn</label>
+        <input type="text" id="social_linkedin" name="social_linkedin" value="<%= userProfile.social_linkedin || '' %>">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="social_x">X / Twitter</label>
+        <input type="text" id="social_x" name="social_x" value="<%= userProfile.social_x || '' %>">
+      </div>
+      <div class="form-group">
+        <label for="bio">Bio</label>
+        <textarea id="bio" name="bio" rows="3"><%= userProfile.bio || '' %></textarea>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn btn-primary">Save profile</button>
+    </div>
+  </form>
+</section>
+<%- include('partials/footer') %>

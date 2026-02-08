@@ -1,0 +1,61 @@
+<%- include('partials/header', { title: 'Dashboard' }) %>
+<section class="card">
+  <h2>Shift Report Submission</h2>
+  <p class="muted">Keep reports short and accurate. Upload up to 10 screenshots.</p>
+  <% if (error) { %>
+    <p class="alert alert-error"><%= error %></p>
+  <% } %>
+  <% if (message) { %>
+    <p class="alert alert-success"><%= message %></p>
+  <% } %>
+
+  <form action="/dashboard" method="POST" enctype="multipart/form-data">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="shift_date">Shift date</label>
+        <input type="date" id="shift_date" name="shift_date" required>
+      </div>
+      <div class="form-group">
+        <label for="location_id">Location</label>
+        <select name="location_id" id="location_id" required>
+          <option value="">Select location</option>
+          <% locations.forEach(loc => { %>
+            <option value="<%= loc.id %>"><%= loc.name %></option>
+          <% }) %>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="cash_tips">Cash value</label>
+        <input type="number" step="0.01" id="cash_tips" name="cash_tips" required>
+      </div>
+      <div class="form-group">
+        <label for="online_tips">Digital value</label>
+        <input type="number" step="0.01" id="online_tips" name="online_tips" required>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="hours">Hours (optional)</label>
+        <input type="number" step="0.1" id="hours" name="hours" placeholder="0.0">
+      </div>
+      <div class="form-group">
+        <label for="cars">Cars handled (optional)</label>
+        <input type="number" id="cars" name="cars" placeholder="0">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="screenshots">Payment screenshots (up to 10)</label>
+      <input type="file" name="screenshots" id="screenshots" accept="image/*" multiple>
+    </div>
+
+    <div class="btn-row">
+      <button type="submit" class="btn btn-primary">Submit report</button>
+    </div>
+  </form>
+</section>
+<%- include('partials/footer') %>

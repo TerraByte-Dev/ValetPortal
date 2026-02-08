@@ -1,0 +1,66 @@
+<%- include('partials/header', { title: 'Groups' }) %>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Group management</p>
+    <h2>Groups</h2>
+    <p class="muted">Create and manage custom containers like Lead or Runner.</p>
+  </div>
+</section>
+
+<section class="card">
+  <h3>Add group</h3>
+  <% if (error) { %>
+    <p class="alert alert-error"><%= error %></p>
+  <% } %>
+  <% if (message) { %>
+    <p class="alert alert-success"><%= message %></p>
+  <% } %>
+  <form action="/admin/groups" method="POST">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="groupName">Group name</label>
+        <input type="text" id="groupName" name="groupName" required>
+      </div>
+      <div class="form-group">
+        <label for="description">Description</label>
+        <input type="text" id="description" name="description" placeholder="Optional">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn btn-primary">Create group</button>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <h3>Existing groups</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% groups.forEach(group => { %>
+          <tr>
+            <td><%= group.name %></td>
+            <td><%= group.description || '—' %></td>
+            <td>
+              <div class="row-actions">
+                <a href="/admin/groups/edit/<%= group.id %>" class="btn btn-ghost">Edit</a>
+                <form action="/admin/groups/delete/<%= group.id %>" method="POST" class="inline-form">
+                  <input type="text" name="confirm_text" placeholder="Type DELETE" required>
+                  <button type="submit" class="btn btn-danger">Remove</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+<%- include('partials/footer') %>

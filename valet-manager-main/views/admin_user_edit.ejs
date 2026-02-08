@@ -1,0 +1,48 @@
+<%- include('partials/header', { title: 'Edit User' }) %>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">User profile</p>
+    <h2>Edit user</h2>
+  </div>
+  <div class="button-row">
+    <a href="/admin/users" class="btn btn-ghost">Back to users</a>
+  </div>
+</section>
+
+<section class="card">
+  <% if (error) { %>
+    <p class="alert alert-error"><%= error %></p>
+  <% } %>
+  <form action="/admin/users/edit/<%= user.id %>" method="POST">
+    <div class="form-group">
+      <label for="name">Display name</label>
+      <input type="text" id="name" name="name" value="<%= user.name %>" required>
+    </div>
+    <div class="form-group">
+      <label for="phone">Phone</label>
+      <input type="text" id="phone" name="phone" value="<%= user.phone %>" required>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="role">Role</label>
+        <select id="role" name="role" required>
+          <option value="valet" <%= user.role === 'valet' ? 'selected' : '' %>>Valet</option>
+          <option value="admin" <%= user.role === 'admin' ? 'selected' : '' %>>Admin</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="group_id">Group</label>
+        <select id="group_id" name="group_id">
+          <option value="">No group</option>
+          <% groups.forEach(group => { %>
+            <option value="<%= group.id %>" <%= String(user.group_id) === String(group.id) ? 'selected' : '' %>><%= group.name %></option>
+          <% }) %>
+        </select>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn btn-primary">Save changes</button>
+    </div>
+  </form>
+</section>
+<%- include('partials/footer') %>

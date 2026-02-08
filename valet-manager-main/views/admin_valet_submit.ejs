@@ -1,0 +1,76 @@
+<%- include('partials/header', { title: 'Valet Submission' }) %>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Admin valet submission</p>
+    <h2>Submit a shift report</h2>
+    <p class="muted">Admins can submit reports on behalf of a valet.</p>
+  </div>
+  <div class="button-row">
+    <a href="/admin/reports" class="btn btn-ghost">View reports</a>
+  </div>
+</section>
+
+<section class="card">
+  <% if (error) { %>
+    <p class="alert alert-error"><%= error %></p>
+  <% } %>
+  <% if (message) { %>
+    <p class="alert alert-success"><%= message %></p>
+  <% } %>
+  <form action="/admin/valet-submission" method="POST" enctype="multipart/form-data">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="valet_id">Valet</label>
+        <select id="valet_id" name="valet_id" required>
+          <option value="">Select valet</option>
+          <% valets.forEach(valet => { %>
+            <option value="<%= valet.id %>"><%= valet.name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="shift_date">Shift date</label>
+        <input type="date" id="shift_date" name="shift_date" required>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="location_id">Location</label>
+        <select id="location_id" name="location_id" required>
+          <option value="">Select location</option>
+          <% locations.forEach(loc => { %>
+            <option value="<%= loc.id %>"><%= loc.name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="hours">Hours (optional)</label>
+        <input type="number" step="0.1" id="hours" name="hours" placeholder="0.0">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="cash_tips">Cash value</label>
+        <input type="number" step="0.01" id="cash_tips" name="cash_tips" required>
+      </div>
+      <div class="form-group">
+        <label for="online_tips">Digital value</label>
+        <input type="number" step="0.01" id="online_tips" name="online_tips" required>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="cars">Cars handled (optional)</label>
+        <input type="number" id="cars" name="cars" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label for="screenshots">Payment screenshots (up to 10)</label>
+        <input type="file" name="screenshots" id="screenshots" accept="image/*" multiple>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn btn-primary">Submit report</button>
+    </div>
+  </form>
+</section>
+<%- include('partials/footer') %>

@@ -1,0 +1,11 @@
+Tweaks:
+Spreadsheets are PER LOCATION, unless it is the bulk spreadsheet
+	|___ Make "Get Spreadsheets" button that redirects to page with all of the current spreadsheets
+Add car count input field for Shift Submit form, adjust tables/spreadsheets accordingly
+Make admin portal more alligned to what trevor wants to see, while maintaining data integrity 
+
+
+
+
+Live Testing
+	-make sure mobile directs to photos not files

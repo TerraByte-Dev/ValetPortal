@@ -1,0 +1,98 @@
+<%- include('partials/header', { title: 'Users' }) %>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">User management</p>
+    <h2>Users</h2>
+    <p class="muted">Add, edit, and remove users. Removal requires typed confirmation.</p>
+  </div>
+</section>
+
+<section class="card">
+  <h3>Add new user</h3>
+  <% if (error) { %>
+    <p class="alert alert-error"><%= error %></p>
+  <% } %>
+  <% if (message) { %>
+    <p class="alert alert-success"><%= message %></p>
+  <% } %>
+  <form action="/admin/users" method="POST">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="first_name">First name</label>
+        <input type="text" id="first_name" name="first_name" required>
+      </div>
+      <div class="form-group">
+        <label for="last_initial">Last initial</label>
+        <input type="text" id="last_initial" name="last_initial" maxlength="1" required>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="phone">Phone number</label>
+        <input type="text" id="phone" name="phone" required>
+      </div>
+      <div class="form-group">
+        <label for="password">Temporary password</label>
+        <input type="password" id="password" name="password" required>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="role">Role</label>
+        <select id="role" name="role" required>
+          <option value="valet">Valet</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="group_id">Group</label>
+        <select id="group_id" name="group_id">
+          <option value="">No group</option>
+          <% groups.forEach(group => { %>
+            <option value="<%= group.id %>"><%= group.name %></option>
+          <% }) %>
+        </select>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn btn-primary">Create user</button>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <h3>Current users</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Phone</th>
+          <th>Role</th>
+          <th>Group</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% users.forEach(user => { %>
+          <tr>
+            <td><%= user.name %></td>
+            <td><%= user.phone %></td>
+            <td><span class="pill"><%= user.role %></span></td>
+            <td><%= user.group_name || '—' %></td>
+            <td>
+              <div class="row-actions">
+                <a href="/admin/users/edit/<%= user.id %>" class="btn btn-ghost">Edit</a>
+                <form action="/admin/users/delete/<%= user.id %>" method="POST" class="inline-form">
+                  <input type="text" name="confirm_text" placeholder="Type DELETE" required>
+                  <button type="submit" class="btn btn-danger">Remove</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+<%- include('partials/footer') %>
