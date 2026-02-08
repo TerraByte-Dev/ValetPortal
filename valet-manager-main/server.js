@@ -1254,56 +1254,120 @@ app.get('/admin/export-weekly', requireAdmin, (req, res) => {
 });
 
 /* ------------------------------
-   Trevor Portal
+   TrevorView
 --------------------------------*/
-app.get('/admin/trevor', requireAdmin, (req, res) => {
+app.get(['/admin/trevor', '/admin/trevorview'], requireAdmin, (req, res) => {
   const query = `
     SELECT sr.*, u.name AS valet_name, u.phone, l.name AS location_name
     FROM shift_reports sr
     JOIN users u ON sr.user_id = u.id
     LEFT JOIN locations l ON sr.location_id = l.id
-    ORDER BY sr.shift_date DESC
+    ORDER BY sr.shift_date ASC
   `;
+  const toDateStr = (value) => {
+    if (!value) return '';
+    if (typeof value === 'string') return value.includes('T') ? value.split('T')[0] : value;
+    if (value instanceof Date) return value.toISOString().slice(0, 10);
+    return '';
+  };
+  const toLocalDate = (dateStr) => {
+    const parts = dateStr.split('-').map(Number);
+    if (parts.length !== 3) return new Date(dateStr);
+    return new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0, 0);
+  };
+
   db.query(query)
     .then((r) => {
-      const reports = r.rows;
-      const dayMap = new Map();
-      reports.forEach((rec) => {
-        let dayStr = rec.shift_date;
-        if (typeof dayStr === 'string' && dayStr.includes('T')) {
-          dayStr = dayStr.split('T')[0];
+      const groupMap = new Map();
+      r.rows.forEach((rec) => {
+        const location = rec.location_name || 'Unspecified';
+        const dayStr = toDateStr(rec.shift_date);
+        if (!dayStr) return;
+        const dayDate = toLocalDate(dayStr);
+        const weekStart = getValetWeekStart(dayDate);
+        const weekStartStr = formatDate(weekStart);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        const weekEndStr = formatDate(weekEnd);
+        const key = `${location}__${weekStartStr}`;
+
+        if (!groupMap.has(key)) {
+          groupMap.set(key, {
+            location,
+            weekStart,
+            weekStartStr,
+            weekEnd,
+            weekEndStr,
+            days: new Map(),
+            valetTotals: new Map()
+          });
         }
-        if (!dayMap.has(dayStr)) dayMap.set(dayStr, []);
-        dayMap.get(dayStr).push(rec);
+
+        const group = groupMap.get(key);
+        if (!group.days.has(dayStr)) {
+          group.days.set(dayStr, {
+            dateStr: dayStr,
+            displayLabel: dayDate.toLocaleDateString('en-US', { weekday: 'short' }),
+            displayDate: dayDate.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
+            shifts: [],
+            totalHours: 0,
+            totalCash: 0,
+            totalOnline: 0,
+            totalCars: 0
+          });
+        }
+        const dayObj = group.days.get(dayStr);
+
+        const hours = Number(rec.hours) || 0;
+        const cash = Number(rec.cash_tips) || 0;
+        const online = Number(rec.online_tips) || 0;
+        const cars = Number(rec.cars) || 0;
+
+        dayObj.shifts.push({
+          name: rec.valet_name,
+          hours,
+          cash,
+          online,
+          cars
+        });
+        dayObj.totalHours += hours;
+        dayObj.totalCash += cash;
+        dayObj.totalOnline += online;
+        dayObj.totalCars += cars;
+
+        if (!group.valetTotals.has(rec.valet_name)) {
+          group.valetTotals.set(rec.valet_name, { name: rec.valet_name, hours: 0, cash: 0, online: 0, cars: 0 });
+        }
+        const valetTotal = group.valetTotals.get(rec.valet_name);
+        valetTotal.hours += hours;
+        valetTotal.cash += cash;
+        valetTotal.online += online;
+        valetTotal.cars += cars;
       });
 
-      const daysData = [];
-      for (let [day, shifts] of dayMap.entries()) {
-        const locMap = new Map();
-        shifts.forEach((r) => {
-          const loc = r.location_name || 'Unspecified';
-          if (!locMap.has(loc)) locMap.set(loc, []);
-          locMap.get(loc).push(r);
-        });
-        const locationsArray = [];
-        for (let [loc, sList] of locMap.entries()) {
-          sList.sort((a, b) => a.valet_name.localeCompare(b.valet_name));
-          let totalHours = 0,
-            totalCars = 0,
-            totalOnline = 0,
-            totalCash = 0;
-          sList.forEach((r) => {
-            totalHours += Number(r.hours) || 0;
-            totalCars += Number(r.cars) || 0;
-            totalOnline += Number(r.online_tips) || 0;
-            totalCash += Number(r.cash_tips) || 0;
-          });
-          locationsArray.push({ location: loc, shifts: sList, totalHours, totalCars, totalOnline, totalCash });
-        }
-        daysData.push({ day, locations: locationsArray });
-      }
-      daysData.sort((a, b) => new Date(b.day) - new Date(a.day));
-      res.render('admin_trevor', { daysData });
+      const groups = Array.from(groupMap.values()).map((group) => {
+        const days = Array.from(group.days.values()).sort((a, b) => new Date(a.dateStr) - new Date(b.dateStr));
+        days.forEach((day) => day.shifts.sort((a, b) => a.name.localeCompare(b.name)));
+        const weeklyTotals = days.reduce(
+          (acc, day) => {
+            acc.hours += day.totalHours;
+            acc.cash += day.totalCash;
+            acc.online += day.totalOnline;
+            acc.cars += day.totalCars;
+            return acc;
+          },
+          { hours: 0, cash: 0, online: 0, cars: 0 }
+        );
+        const valetTotals = Array.from(group.valetTotals.values()).sort((a, b) => a.name.localeCompare(b.name));
+        return { ...group, days, weeklyTotals, valetTotals };
+      });
+
+      groups.sort((a, b) => {
+        if (a.weekStartStr === b.weekStartStr) return a.location.localeCompare(b.location);
+        return new Date(b.weekStartStr) - new Date(a.weekStartStr);
+      });
+
+      res.render('admin_trevor', { groups });
     })
     .catch((err) => res.send('Error retrieving shift reports: ' + err.message));
 });

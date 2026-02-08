@@ -362,6 +362,72 @@ p {
   color: var(--muted);
 }
 
+.trevor-sheet {
+  background: linear-gradient(transparent 95%, rgba(255, 255, 255, 0.04) 95%),
+    linear-gradient(90deg, transparent 96%, rgba(255, 255, 255, 0.05) 96%),
+    var(--surface);
+  background-size: 100% 32px, 180px 100%;
+}
+
+.trevor-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.trevor-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.95rem;
+}
+
+.trevor-table th,
+.trevor-table td {
+  border: 1px solid var(--border);
+  padding: 0.6rem 0.5rem;
+  vertical-align: top;
+}
+
+.trevor-table th {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.7rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.trevor-total {
+  font-weight: 600;
+}
+
+.trevor-subline {
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.3;
+}
+
+.trevor-totals-row td {
+  background: rgba(255, 255, 255, 0.04);
+  font-weight: 600;
+}
+
+.trevor-valet-totals {
+  margin-top: 1.25rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.trevor-valet {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.75rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
 .card {
   background: var(--surface);
   border-radius: var(--radius-lg);

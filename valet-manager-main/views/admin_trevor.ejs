@@ -1,81 +1,115 @@
-<%- include('partials/header', { title: 'Trevor Portal' }) %>
-<div>
-  <h2>Trevor Portal - Manager Notebook Style</h2>
-  <p><a href="/admin" class="btn-dark">Back to Admin Portal</a></p>
+<%- include('partials/header', { title: 'TrevorView' }) %>
+<%
+  const fmtNum = (val) => {
+    const num = Number(val) || 0;
+    if (Number.isInteger(num)) return String(num);
+    return num.toFixed(2).replace(/\.00$/, '');
+  };
+  const fmtMoney = (val) => {
+    const num = Number(val) || 0;
+    const fixed = num % 1 === 0 ? num.toFixed(0) : num.toFixed(2);
+    return `$${fixed}`;
+  };
+  const fmtRange = (start, end) => {
+    try {
+      const startStr = new Date(start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const endStr = new Date(end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      return `${startStr} - ${endStr}`;
+    } catch (e) {
+      return '';
+    }
+  };
+%>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">TrevorView</p>
+    <h2>Manager notebook format</h2>
+    <p class="muted">Weekly summaries per location with quick totals.</p>
+  </div>
+  <div class="button-row">
+    <a href="/admin" class="btn btn-ghost">Back to Admin</a>
+  </div>
+</section>
 
-  <% daysData.forEach(dayObj => { 
-       // Manually parse dayObj.day (YYYY-MM-DD) into a local date
-       let displayDate = dayObj.day;
-       try {
-         const [yyyy, mm, dd] = dayObj.day.split('-').map(Number);
-         const d = new Date(yyyy, mm - 1, dd);
-         // Get "Month Day, Year" (e.g., "March 5, 2025")
-         const dateString = d.toLocaleDateString('en-US', { 
-           year: 'numeric', 
-           month: 'long', 
-           day: 'numeric'
-         });
-         // Get the weekday (e.g., "Wednesday")
-         const weekdayString = d.toLocaleDateString('en-US', { weekday: 'long' });
-         // Combine them
-         displayDate = `${dateString} - ${weekdayString}`;
-       } catch(e) {
-         // fallback if parse fails
-         displayDate = dayObj.day;
-       }
-  %>
-    <!-- Display the combined date + weekday -->
-    <h3>Date: <%= displayDate %></h3>
+<% if (!groups || groups.length === 0) { %>
+  <section class="card empty-state">
+    <h3>No reports yet</h3>
+    <p class="muted">Submit a shift report to populate TrevorView.</p>
+  </section>
+<% } %>
 
-    <% dayObj.locations.forEach(locObj => { 
-         let totalHours = 0, totalCars = 0, totalOnline = 0, totalCash = 0;
-         locObj.shifts.forEach(shift => {
-           totalHours += Number(shift.hours) || 0;
-           totalCars += Number(shift.cars) || 0;
-           totalOnline += Number(shift.online_tips) || 0;
-           totalCash += Number(shift.cash_tips) || 0;
-         });
-         const totalTips = totalOnline + totalCash;
-    %>
-      <h4>Location: <%= locObj.location %></h4>
-      <table border="1" cellspacing="0" cellpadding="5" style="margin-bottom: 1em;">
+<% groups.forEach(group => { %>
+  <section class="card trevor-sheet">
+    <div class="trevor-sheet-header">
+      <div>
+        <h3><%= group.location %></h3>
+        <p class="muted">Week of <%= fmtRange(group.weekStart, group.weekEnd) %></p>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="trevor-table">
         <thead>
           <tr>
-            <th>Valet Name</th>
+            <th>Date</th>
             <th>Hours</th>
+            <th>Cash</th>
+            <th>Online</th>
             <th>Cars</th>
-            <th>Online Tips</th>
-            <th>Cash Tips</th>
-            <th>Total</th>
           </tr>
         </thead>
         <tbody>
-          <% locObj.shifts.forEach(shift => { 
-               const shiftTotal = Number(shift.online_tips) + Number(shift.cash_tips);
-          %>
+          <% group.days.forEach(day => { %>
             <tr>
-              <td><%= shift.valet_name %></td>
-              <td><%= shift.hours %></td>
-              <td><%= shift.cars %></td>
-              <td><%= shift.online_tips %></td>
-              <td><%= shift.cash_tips %></td>
-              <td><%= shiftTotal %></td>
+              <td class="trevor-date">
+                <div class="trevor-total"><%= day.displayLabel %></div>
+                <div class="trevor-subline"><%= day.displayDate %></div>
+              </td>
+              <td>
+                <div class="trevor-total"><%= fmtNum(day.totalHours) %></div>
+                <% day.shifts.forEach(shift => { %>
+                  <div class="trevor-subline"><%= shift.name %> - <%= fmtNum(shift.hours) %></div>
+                <% }) %>
+              </td>
+              <td>
+                <div class="trevor-total"><%= fmtMoney(day.totalCash) %></div>
+                <% day.shifts.forEach(shift => { %>
+                  <div class="trevor-subline"><%= shift.name %> - <%= fmtMoney(shift.cash) %></div>
+                <% }) %>
+              </td>
+              <td>
+                <div class="trevor-total"><%= fmtMoney(day.totalOnline) %></div>
+                <% day.shifts.forEach(shift => { %>
+                  <div class="trevor-subline"><%= shift.name %> - <%= fmtMoney(shift.online) %></div>
+                <% }) %>
+              </td>
+              <td>
+                <div class="trevor-total"><%= fmtNum(day.totalCars) %></div>
+                <% day.shifts.forEach(shift => { %>
+                  <div class="trevor-subline"><%= shift.name %> - <%= fmtNum(shift.cars) %></div>
+                <% }) %>
+              </td>
             </tr>
-          <% }); %>
-          <tr style="font-weight: bold;">
-            <td>Location Totals:</td>
-            <td><%= totalHours %></td>
-            <td><%= totalCars %></td>
-            <td><%= totalOnline %></td>
-            <td><%= totalCash %></td>
-            <td><%= totalTips %></td>
+          <% }) %>
+          <tr class="trevor-totals-row">
+            <td>Totals</td>
+            <td><%= fmtNum(group.weeklyTotals.hours) %></td>
+            <td><%= fmtMoney(group.weeklyTotals.cash) %></td>
+            <td><%= fmtMoney(group.weeklyTotals.online) %></td>
+            <td><%= fmtNum(group.weeklyTotals.cars) %></td>
           </tr>
         </tbody>
       </table>
-    <% }); %>
-    <hr>
-  <% }); %>
+    </div>
 
-  <p><a href="/admin" class="btn-dark">Back to Admin Portal</a></p>
-</div>
+    <div class="trevor-valet-totals">
+      <% group.valetTotals.forEach(valet => { %>
+        <div class="trevor-valet">
+          <strong><%= valet.name %></strong>
+          <span class="muted"><%= fmtNum(valet.hours) %> hrs · <%= fmtMoney(valet.cash + valet.online) %></span>
+        </div>
+      <% }) %>
+    </div>
+  </section>
+<% }) %>
 <%- include('partials/footer') %>
