@@ -624,6 +624,21 @@ th, td {
     justify-content: space-between;
   }
 
+  .nav-dropdown {
+    width: 100%;
+  }
+
+  .nav-dropdown summary {
+    width: 100%;
+  }
+
+  .dropdown-panel {
+    left: 0;
+    right: 0;
+    width: 100%;
+    min-width: 0;
+  }
+
   .report-header,
   .report-row {
     grid-template-columns: repeat(2, 1fr);
