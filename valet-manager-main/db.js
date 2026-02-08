@@ -46,7 +46,18 @@ async function waitForDbAndCreateTables(maxRetries = 15, baseDelayMs = 700) {
     CREATE TABLE IF NOT EXISTS groups (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
-      description TEXT
+      description TEXT,
+      visible_in_sidebar BOOLEAN DEFAULT TRUE
+    );
+  `;
+
+  const createCommunityMessages = `
+    CREATE TABLE IF NOT EXISTS community_messages (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      body TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `;
 
@@ -81,6 +92,7 @@ async function waitForDbAndCreateTables(maxRetries = 15, baseDelayMs = 700) {
       await pool.query(createUsers);
       await pool.query(createLocations);
       await pool.query(createGroups);
+      await pool.query(createCommunityMessages);
       await pool.query(createShiftReports);
       await pool.query(createShiftScreenshots);
 
@@ -94,6 +106,9 @@ async function waitForDbAndCreateTables(maxRetries = 15, baseDelayMs = 700) {
       await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS social_x TEXT`);
       await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT`);
       await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS links TEXT`);
+
+      await pool.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS visible_in_sidebar BOOLEAN DEFAULT TRUE`);
+      await pool.query(`UPDATE groups SET visible_in_sidebar = TRUE WHERE visible_in_sidebar IS NULL`);
 
       await pool.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_group_id_fkey`);
       await pool.query(

@@ -1,0 +1,96 @@
+<%- include('partials/header', { title: 'Community' }) %>
+<%
+  const formatDate = (d) => {
+    try {
+      return new Date(d).toLocaleString('en-US');
+    } catch (e) {
+      return d;
+    }
+  };
+%>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Community</p>
+    <h2>Team Board</h2>
+    <p class="muted">Latest updates from the valet team.</p>
+  </div>
+</section>
+
+<section class="community-layout">
+  <div class="community-feed">
+    <section class="card">
+      <h3>Post an update</h3>
+      <form action="/community" method="POST">
+        <div class="form-group">
+          <label for="body">Message</label>
+          <textarea id="body" name="body" rows="3" placeholder="Share an update with the team..." required></textarea>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn btn-primary">Post</button>
+        </div>
+      </form>
+      <% if (error) { %>
+        <p class="alert alert-error"><%= error %></p>
+      <% } %>
+    </section>
+
+    <section class="feed-list">
+      <% if (!messages.length) { %>
+        <div class="card empty-state">
+          <h3>No posts yet</h3>
+          <p class="muted">Be the first to post an update.</p>
+        </div>
+      <% } %>
+      <% messages.forEach(msg => { %>
+        <article class="post-card">
+          <div class="post-header">
+            <div class="post-avatar">
+              <% if (msg.profile_photo_url) { %>
+                <img src="/uploads/<%= msg.profile_photo_url %>" alt="Profile photo">
+              <% } else { %>
+                <span><%= msg.name.split(' ').map(w => w[0]).join('') %></span>
+              <% } %>
+            </div>
+            <div>
+              <strong><%= msg.name %></strong>
+              <% if (msg.group_name) { %>
+                <span class="muted"> · <%= msg.group_name %></span>
+              <% } %>
+              <div class="muted"><%= formatDate(msg.created_at) %></div>
+            </div>
+          </div>
+          <p><%= msg.body %></p>
+          <% if (msg.updated_at && String(msg.updated_at) !== String(msg.created_at)) { %>
+            <span class="muted">Edited</span>
+          <% } %>
+        </article>
+      <% }) %>
+    </section>
+  </div>
+
+  <aside class="community-sidebar">
+    <section class="card">
+      <h3>Team members</h3>
+      <div class="member-list">
+        <% users.forEach(user => { %>
+          <div class="member-row">
+            <div class="member-avatar">
+              <% if (user.profile_photo_url) { %>
+                <img src="/uploads/<%= user.profile_photo_url %>" alt="Profile photo">
+              <% } else { %>
+                <span><%= user.name.split(' ').map(w => w[0]).join('') %></span>
+              <% } %>
+            </div>
+            <div>
+              <strong><%= user.name %></strong>
+              <% if (user.group_name) { %>
+                <div class="muted"><%= user.group_name %></div>
+              <% } %>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </section>
+  </aside>
+</section>
+<%- include('partials/footer') %>

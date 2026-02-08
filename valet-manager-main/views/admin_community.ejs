@@ -1,0 +1,78 @@
+<%- include('partials/header', { title: 'Community Admin' }) %>
+<%
+  const formatDate = (d) => {
+    try {
+      return new Date(d).toLocaleString('en-US');
+    } catch (e) {
+      return d;
+    }
+  };
+%>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Community moderation</p>
+    <h2>Team Board admin</h2>
+    <p class="muted">Edit or remove posts and control sidebar visibility.</p>
+  </div>
+  <div class="button-row">
+    <form action="/admin/community/clear" method="POST" onsubmit="return confirm('Clear all community messages?');">
+      <button type="submit" class="btn btn-danger">Clear all messages</button>
+    </form>
+  </div>
+</section>
+
+<section class="card">
+  <h3>Sidebar visibility by group</h3>
+  <p class="muted">Hide a group to remove its members from the Team Board sidebar.</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Group</th>
+          <th>Visible</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% groups.forEach(group => { %>
+          <tr>
+            <td><%= group.name %></td>
+            <td><%= group.visible_in_sidebar ? 'Visible' : 'Hidden' %></td>
+            <td>
+              <form action="/admin/community/groups/<%= group.id %>" method="POST" class="inline-form">
+                <input type="hidden" name="visible" value="<%= group.visible_in_sidebar ? 'false' : 'true' %>">
+                <button type="submit" class="btn btn-ghost"><%= group.visible_in_sidebar ? 'Hide' : 'Show' %></button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <h3>Message moderation</h3>
+  <% if (!messages.length) { %>
+    <p class="muted">No messages yet.</p>
+  <% } %>
+  <div class="admin-message-list">
+    <% messages.forEach(msg => { %>
+      <div class="admin-message">
+        <div class="muted"><strong><%= msg.name %></strong> · <%= formatDate(msg.created_at) %></div>
+        <div class="admin-message-actions">
+          <form action="/admin/community/edit/<%= msg.id %>" method="POST" class="admin-message-form">
+            <textarea name="body" rows="2"><%= msg.body %></textarea>
+            <div class="row-actions">
+              <button type="submit" class="btn btn-primary">Update</button>
+            </div>
+          </form>
+          <form action="/admin/community/delete/<%= msg.id %>" method="POST" class="inline-form" onsubmit="return confirm('Delete this message?');">
+            <button type="submit" class="btn btn-danger">Delete</button>
+          </form>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+</section>
+<%- include('partials/footer') %>

@@ -53,16 +53,21 @@
               <a href="/admin/charts">Charts</a>
               <a href="/admin/charts-compare">Compare</a>
               <a href="/admin/screenshots">Screenshots</a>
+              <a href="/admin/community">Community Admin</a>
+              <a href="/logout" class="menu-danger">Logout</a>
             </div>
           </details>
         <% } else { %>
-          <nav class="inline-nav">
-            <a href="/dashboard">Shift Report</a>
-            <a href="/profile">Profile</a>
-            <a href="/messages">Messages</a>
-          </nav>
+          <details class="nav-dropdown">
+            <summary>Valet Menu</summary>
+            <div class="dropdown-panel">
+              <a href="/dashboard">Shift Report</a>
+              <a href="/profile">Profile</a>
+              <a href="/community">Community</a>
+              <a href="/logout" class="menu-danger">Logout</a>
+            </div>
+          </details>
         <% } %>
-        <a href="/logout" class="btn btn-ghost">Logout</a>
       <% } else { %>
         <nav class="inline-nav">
           <a href="/about">About</a>

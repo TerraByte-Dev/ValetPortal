@@ -272,7 +272,47 @@ app.post('/profile', requireLogin, profileUpload.single('profile_photo'), (req, 
 });
 
 app.get('/messages', requireLogin, (req, res) => {
-  res.render('messages');
+  res.redirect('/community');
+});
+
+/* ------------------------------
+   Community: Team Board
+--------------------------------*/
+app.get('/community', requireLogin, (req, res) => {
+  const messagesQuery = `
+    SELECT cm.id, cm.body, cm.created_at, cm.updated_at,
+           u.name, u.profile_photo_url, g.name AS group_name
+    FROM community_messages cm
+    JOIN users u ON cm.user_id = u.id
+    LEFT JOIN groups g ON u.group_id = g.id
+    ORDER BY cm.created_at DESC
+  `;
+  const usersQuery = `
+    SELECT u.id, u.name, u.profile_photo_url, g.name AS group_name
+    FROM users u
+    LEFT JOIN groups g ON u.group_id = g.id
+    WHERE (g.visible_in_sidebar IS TRUE OR g.visible_in_sidebar IS NULL)
+    ORDER BY u.name ASC
+  `;
+  Promise.all([db.query(messagesQuery), db.query(usersQuery)])
+    .then(([messages, users]) =>
+      res.render('community', {
+        messages: messages.rows,
+        users: users.rows,
+        error: null
+      })
+    )
+    .catch((err) =>
+      res.render('community', { messages: [], users: [], error: 'Error loading community: ' + err.message })
+    );
+});
+
+app.post('/community', requireLogin, (req, res) => {
+  const body = String(req.body.body || '').trim();
+  if (!body) return res.redirect('/community');
+  db.query('INSERT INTO community_messages (user_id, body) VALUES ($1, $2)', [req.session.user.id, body])
+    .then(() => res.redirect('/community'))
+    .catch(() => res.redirect('/community'));
 });
 
 /* ------------------------------
@@ -736,6 +776,60 @@ app.post('/admin/groups/delete/:id', requireAdmin, (req, res) => {
   db.query('DELETE FROM groups WHERE id = $1', [id])
     .then(() => res.redirect('/admin/groups'))
     .catch((err) => res.send('Error deleting group: ' + err.message));
+});
+
+/* ------------------------------
+   Admin: Community Moderation
+--------------------------------*/
+app.get('/admin/community', requireAdmin, (req, res) => {
+  const messagesQuery = `
+    SELECT cm.id, cm.body, cm.created_at, cm.updated_at,
+           u.name, u.profile_photo_url, g.name AS group_name
+    FROM community_messages cm
+    JOIN users u ON cm.user_id = u.id
+    LEFT JOIN groups g ON u.group_id = g.id
+    ORDER BY cm.created_at DESC
+  `;
+  Promise.all([db.query(messagesQuery), db.query('SELECT * FROM groups ORDER BY name ASC')])
+    .then(([messages, groups]) =>
+      res.render('admin_community', {
+        messages: messages.rows,
+        groups: groups.rows,
+        error: null,
+        message: null
+      })
+    )
+    .catch((err) => res.send('Error loading community admin: ' + err.message));
+});
+
+app.post('/admin/community/clear', requireAdmin, (req, res) => {
+  db.query('DELETE FROM community_messages')
+    .then(() => res.redirect('/admin/community'))
+    .catch((err) => res.send('Error clearing messages: ' + err.message));
+});
+
+app.post('/admin/community/delete/:id', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  db.query('DELETE FROM community_messages WHERE id = $1', [id])
+    .then(() => res.redirect('/admin/community'))
+    .catch((err) => res.send('Error deleting message: ' + err.message));
+});
+
+app.post('/admin/community/edit/:id', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const body = String(req.body.body || '').trim();
+  if (!body) return res.redirect('/admin/community');
+  db.query('UPDATE community_messages SET body = $1, updated_at = NOW() WHERE id = $2', [body, id])
+    .then(() => res.redirect('/admin/community'))
+    .catch((err) => res.send('Error updating message: ' + err.message));
+});
+
+app.post('/admin/community/groups/:id', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const visible = req.body.visible === 'true';
+  db.query('UPDATE groups SET visible_in_sidebar = $1 WHERE id = $2', [visible, id])
+    .then(() => res.redirect('/admin/community'))
+    .catch((err) => res.send('Error updating group visibility: ' + err.message));
 });
 
 /* ------------------------------
