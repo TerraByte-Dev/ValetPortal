@@ -1,17 +1,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 :root {
-  --bg: #f2f4f8;
-  --surface: #ffffff;
-  --surface-muted: #f6f8fb;
-  --ink: #101828;
-  --muted: #5f6b7a;
-  --primary: #0b3d91;
-  --primary-strong: #062a66;
-  --accent: #00a6a6;
-  --danger: #a63636;
-  --border: #e2e7f0;
-  --shadow: 0 18px 35px rgba(16, 24, 40, 0.08);
+  --bg: #0b0f14;
+  --surface: #121824;
+  --surface-muted: #161e2b;
+  --ink: #e6ecf5;
+  --muted: #9aa6b2;
+  --primary: #4f8cff;
+  --primary-strong: #3a6dd8;
+  --accent: #1fd1c3;
+  --danger: #d05252;
+  --border: #202a3a;
+  --shadow: 0 16px 32px rgba(0, 0, 0, 0.35);
   --radius-lg: 18px;
   --radius-md: 12px;
   --radius-sm: 8px;
@@ -34,8 +34,8 @@ body {
   flex-direction: column;
   font-family: var(--font-sans);
   color: var(--ink);
-  background: radial-gradient(circle at top right, #eaf0f7 0%, transparent 45%),
-    radial-gradient(circle at 10% 10%, #e6fbff 0%, transparent 35%),
+  background: radial-gradient(circle at top right, rgba(79, 140, 255, 0.12) 0%, transparent 45%),
+    radial-gradient(circle at 10% 10%, rgba(31, 209, 195, 0.12) 0%, transparent 35%),
     var(--bg);
 }
 
@@ -69,7 +69,7 @@ p {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: rgba(242, 244, 248, 0.92);
+  background: rgba(11, 15, 20, 0.92);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
   display: flex;
@@ -90,7 +90,7 @@ p {
   height: 36px;
   border-radius: 10px;
   background: linear-gradient(135deg, var(--primary), var(--accent));
-  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.45);
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.15);
 }
 
 .brand-text {
@@ -128,6 +128,13 @@ p {
   display: grid;
   place-items: center;
   font-weight: 600;
+  overflow: hidden;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .user-label {
@@ -175,7 +182,7 @@ p {
 }
 
 .dropdown-panel a:hover {
-  background: var(--surface-muted);
+  background: #1b2433;
 }
 
 .app-footer {
@@ -196,6 +203,10 @@ p {
   margin-bottom: 2.5rem;
 }
 
+.compact-hero {
+  margin-top: 2rem;
+}
+
 .hero-content h1 {
   font-size: clamp(2rem, 4vw, 3.5rem);
 }
@@ -203,6 +214,13 @@ p {
 .lead {
   font-size: 1.1rem;
   color: var(--muted);
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
 }
 
 .hero-card {
@@ -223,6 +241,44 @@ p {
   padding: 1.5rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.pricing-card {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+}
+
+.pricing-card.highlighted {
+  border-color: rgba(31, 209, 195, 0.6);
+  box-shadow: var(--shadow);
+}
+
+.price {
+  font-size: 1.8rem;
+  margin: 0.5rem 0;
+}
+
+.price span {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+  display: grid;
+  gap: 0.4rem;
+  color: var(--muted);
 }
 
 .card {
@@ -361,6 +417,21 @@ p {
   gap: 1rem;
 }
 
+.profile-preview {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  margin-bottom: 0.5rem;
+}
+
+.profile-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 form input,
 form select,
 form textarea {
@@ -370,6 +441,7 @@ form textarea {
   font-family: inherit;
   font-size: 0.95rem;
   background: var(--surface-muted);
+  color: var(--ink);
 }
 
 form textarea {
@@ -458,7 +530,7 @@ th, td {
 }
 
 .report-row:hover {
-  background: #eef3fb;
+  background: #1f2a3d;
 }
 
 .detail-grid {
@@ -525,13 +597,13 @@ th, td {
 }
 
 .alert-error {
-  background: #ffe9e9;
-  color: #8a1f1f;
+  background: rgba(208, 82, 82, 0.15);
+  color: #ffb3b3;
 }
 
 .alert-success {
-  background: #e6f7f2;
-  color: #0f5a47;
+  background: rgba(31, 209, 195, 0.12);
+  color: #7ee7dc;
 }
 
 .empty-state {

@@ -26,7 +26,13 @@
            }
         %>
         <div class="user-chip">
-          <div class="avatar"><%= getInitials(user.name) %></div>
+          <div class="avatar">
+            <% if (user.profile_photo_url) { %>
+              <img src="/uploads/<%= user.profile_photo_url %>" alt="Profile photo">
+            <% } else { %>
+              <%= getInitials(user.name) %>
+            <% } %>
+          </div>
           <div class="user-meta">
             <span class="user-label">Signed in</span>
             <strong><%= user.name %></strong>
@@ -59,6 +65,7 @@
         <a href="/logout" class="btn btn-ghost">Logout</a>
       <% } else { %>
         <nav class="inline-nav">
+          <a href="/about">About</a>
           <a href="/login" class="btn btn-primary">Login</a>
           <a href="/register" class="btn btn-ghost">Register</a>
         </nav>

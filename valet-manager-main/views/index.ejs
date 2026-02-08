@@ -1,67 +1,14 @@
 <%- include('partials/header', { title: 'Valet Management Portal' }) %>
-<section class="hero">
+<section class="hero compact-hero">
   <div class="hero-content">
-    <p class="eyebrow">Mobile-first valet operations</p>
-    <h1>Run valet teams with clarity, speed, and accountability.</h1>
-    <p class="lead">
-      A secure management portal for admins and a streamlined community space for valets.
-      Submit shift reports, review weekly performance, and keep every location in sync.
-    </p>
-    <% if (!user) { %>
-      <div class="hero-actions">
-        <a href="/login" class="btn btn-primary">Login</a>
-        <a href="/register" class="btn btn-ghost">Register</a>
-      </div>
-    <% } else { %>
-      <div class="hero-actions">
-        <% if(user.role === 'admin') { %>
-          <a href="/admin" class="btn btn-primary">Go to Admin Portal</a>
-        <% } else { %>
-          <a href="/dashboard" class="btn btn-primary">Go to Valet Dashboard</a>
-        <% } %>
-      </div>
-    <% } %>
-  </div>
-  <div class="hero-card">
-    <h3>Weekly Focus</h3>
-    <p class="muted">Week starts Monday at 6:00 AM to capture late Sunday shifts.</p>
-    <div class="stat-grid">
-      <div class="stat">
-        <span class="stat-label">Shift Reports</span>
-        <strong>Live</strong>
-      </div>
-      <div class="stat">
-        <span class="stat-label">Locations</span>
-        <strong>Tracked</strong>
-      </div>
-      <div class="stat">
-        <span class="stat-label">Valet Community</span>
-        <strong>Connected</strong>
-      </div>
-      <div class="stat">
-        <span class="stat-label">Analytics</span>
-        <strong>Ready</strong>
-      </div>
+    <p class="eyebrow">Valet Management Portal</p>
+    <h1>Sign in to manage shifts.</h1>
+    <p class="lead">Admins and valets use the same secure entry point.</p>
+    <div class="hero-actions">
+      <a href="/login" class="btn btn-primary">Login</a>
+      <a href="/register" class="btn btn-ghost">Register</a>
+      <a href="/about" class="btn btn-ghost">About</a>
     </div>
-  </div>
-</section>
-
-<section class="feature-grid">
-  <div class="feature-card">
-    <h3>Admin Command Center</h3>
-    <p>Weekly leaderboards, analytics, and instant access to reports per valet and location.</p>
-  </div>
-  <div class="feature-card">
-    <h3>Valet Submissions</h3>
-    <p>Fast, mobile-friendly reporting with optional hours and up to 10 screenshots.</p>
-  </div>
-  <div class="feature-card">
-    <h3>Secure IAM Style</h3>
-    <p>Clean Azure-inspired identity flows and role-based access at every step.</p>
-  </div>
-  <div class="feature-card">
-    <h3>Groups & Locations</h3>
-    <p>Organize teams by role or location, and manage changes with typed confirmation.</p>
   </div>
 </section>
 <%- include('partials/footer') %>

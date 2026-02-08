@@ -1,0 +1,5 @@
+Too bright, make dark theme across the board. 
+Landing page is too much information, need to be cleaner, not trying to advertise its features, just a login/register buttons. Logged in users wont see this site again unless logging out. Logged in valets should see the shift report submission as the first page.  Add "About" page that is navigatable from the landing page that has all of the features, selling points, and fake pricing, that looks real, just isnt hooked to any payment system.  
+Profile pictures should be uploaded images, not a url. would replace FIRST INTITIAL + LAST INITIAL default profile pic. Contact phone, LinkedIn, and Bio are good. rest can be scrapped and replaced with a general "Links" where you can add a list of multiple social links. 
+Give me step by step instructions on setting up an admin account so I can begin giving feedback on the admin view.
+

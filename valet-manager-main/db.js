@@ -30,7 +30,8 @@ async function waitForDbAndCreateTables(maxRetries = 15, baseDelayMs = 700) {
       social_instagram TEXT,
       social_linkedin TEXT,
       social_x TEXT,
-      bio TEXT
+      bio TEXT,
+      links TEXT
     );
   `;
 
@@ -92,6 +93,7 @@ async function waitForDbAndCreateTables(maxRetries = 15, baseDelayMs = 700) {
       await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS social_linkedin TEXT`);
       await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS social_x TEXT`);
       await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS links TEXT`);
 
       await pool.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_group_id_fkey`);
       await pool.query(

@@ -97,13 +97,31 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+const profileStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const ext = path.extname(file.originalname);
+    cb(null, 'profile-' + uniqueSuffix + ext);
+  }
+});
+const profileUpload = multer({ storage: profileStorage });
+
 /* ------------------------------
    Routes
 --------------------------------*/
 
 // Home
 app.get('/', (req, res) => {
+  if (req.session.user) {
+    if (req.session.user.role === 'admin') return res.redirect('/admin');
+    return res.redirect('/dashboard');
+  }
   res.render('index');
+});
+
+app.get('/about', (req, res) => {
+  res.render('about');
 });
 
 // Register
@@ -217,36 +235,31 @@ app.get('/profile', requireLogin, (req, res) => {
     .catch((err) => res.render('profile', { userProfile: req.session.user, error: err.message, message: null }));
 });
 
-app.post('/profile', requireLogin, (req, res) => {
+app.post('/profile', requireLogin, profileUpload.single('profile_photo'), (req, res) => {
   const {
-    profile_photo_url,
-    contact_email,
     contact_phone,
-    social_instagram,
     social_linkedin,
-    social_x,
-    bio
+    bio,
+    links,
+    existing_photo
   } = req.body;
+  const profilePhoto = req.file ? req.file.filename : (existing_photo || null);
   const updateQuery = `
     UPDATE users
     SET profile_photo_url = $1,
-        contact_email = $2,
-        contact_phone = $3,
-        social_instagram = $4,
-        social_linkedin = $5,
-        social_x = $6,
-        bio = $7
-    WHERE id = $8
+        contact_phone = $2,
+        social_linkedin = $3,
+        bio = $4,
+        links = $5
+    WHERE id = $6
     RETURNING *
   `;
   db.query(updateQuery, [
-    profile_photo_url || null,
-    contact_email || null,
+    profilePhoto,
     contact_phone || null,
-    social_instagram || null,
     social_linkedin || null,
-    social_x || null,
     bio || null,
+    links || null,
     req.session.user.id
   ])
     .then((r) => {

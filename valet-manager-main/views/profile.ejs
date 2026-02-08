@@ -14,25 +14,22 @@
   <% if (message) { %>
     <p class="alert alert-success"><%= message %></p>
   <% } %>
-  <form action="/profile" method="POST">
+  <form action="/profile" method="POST" enctype="multipart/form-data">
+    <input type="hidden" name="existing_photo" value="<%= userProfile.profile_photo_url || '' %>">
     <div class="form-group">
-      <label for="profile_photo_url">Profile photo URL</label>
-      <input type="text" id="profile_photo_url" name="profile_photo_url" value="<%= userProfile.profile_photo_url || '' %>" placeholder="https://">
+      <label for="profile_photo">Profile photo upload</label>
+      <% if (userProfile.profile_photo_url) { %>
+        <div class="profile-preview">
+          <img src="/uploads/<%= userProfile.profile_photo_url %>" alt="Profile photo">
+        </div>
+      <% } %>
+      <input type="file" id="profile_photo" name="profile_photo" accept="image/*">
+      <p class="muted">Upload a square image for best results.</p>
     </div>
     <div class="form-row">
-      <div class="form-group">
-        <label for="contact_email">Contact email</label>
-        <input type="email" id="contact_email" name="contact_email" value="<%= userProfile.contact_email || '' %>">
-      </div>
       <div class="form-group">
         <label for="contact_phone">Contact phone</label>
         <input type="text" id="contact_phone" name="contact_phone" value="<%= userProfile.contact_phone || '' %>">
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label for="social_instagram">Instagram</label>
-        <input type="text" id="social_instagram" name="social_instagram" value="<%= userProfile.social_instagram || '' %>">
       </div>
       <div class="form-group">
         <label for="social_linkedin">LinkedIn</label>
@@ -41,12 +38,13 @@
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label for="social_x">X / Twitter</label>
-        <input type="text" id="social_x" name="social_x" value="<%= userProfile.social_x || '' %>">
-      </div>
-      <div class="form-group">
         <label for="bio">Bio</label>
         <textarea id="bio" name="bio" rows="3"><%= userProfile.bio || '' %></textarea>
+      </div>
+      <div class="form-group">
+        <label for="links">Links</label>
+        <textarea id="links" name="links" rows="3" placeholder="https://example.com\nhttps://another.com"><%= userProfile.links || '' %></textarea>
+        <p class="muted">Add one link per line.</p>
       </div>
     </div>
     <div class="btn-row">
