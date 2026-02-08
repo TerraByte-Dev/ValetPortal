@@ -41,7 +41,8 @@ const sessionStore = new pgSession({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined
   },
-  tableName: 'session'
+  tableName: 'session',
+  createTableIfMissing: true
 });
 
 app.use(
