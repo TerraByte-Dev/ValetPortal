@@ -119,16 +119,45 @@ function selectedAttributeLabel(attribute) {
   return 'Hours';
 }
 
+function todayEstIsoDate() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date());
+  const year = parts.find((p) => p.type === 'year')?.value;
+  const month = parts.find((p) => p.type === 'month')?.value;
+  const day = parts.find((p) => p.type === 'day')?.value;
+  return `${year}-${month}-${day}`;
+}
+
+function addDaysToIsoDate(isoDate, days) {
+  const [yyyy, mm, dd] = isoDate.split('-').map(Number);
+  const dt = new Date(Date.UTC(yyyy, mm - 1, dd, 12, 0, 0, 0));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  const y = dt.getUTCFullYear();
+  const m = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(dt.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 function getRequestedWeekRange(weekStartParam) {
-  const baseDate = weekStartParam ? new Date(`${weekStartParam}T12:00:00`) : new Date();
-  const weekStart = getValetWeekStart(baseDate);
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekEnd.getDate() + 7);
+  const baseIso = /^\d{4}-\d{2}-\d{2}$/.test(weekStartParam || '')
+    ? weekStartParam
+    : todayEstIsoDate();
+  const [yyyy, mm, dd] = baseIso.split('-').map(Number);
+  const baseUtcNoon = new Date(Date.UTC(yyyy, mm - 1, dd, 12, 0, 0, 0));
+  const diffToMonday = (baseUtcNoon.getUTCDay() + 6) % 7;
+  const weekStartDate = addDaysToIsoDate(baseIso, -diffToMonday);
+  const weekEndDate = addDaysToIsoDate(weekStartDate, 7);
+  const weekStart = parseDateForEst(weekStartDate);
+  const weekEnd = parseDateForEst(weekEndDate);
   return {
     weekStart,
     weekEnd,
-    weekStartDate: formatDate(weekStart),
-    weekEndDate: formatDate(weekEnd)
+    weekStartDate,
+    weekEndDate
   };
 }
 
@@ -1321,6 +1350,13 @@ app.get('/admin/leaderboard', requireAdmin, (req, res) => {
 app.get('/admin/charts', requireAdmin, (req, res) => {
   const locationFilter = req.query.location_id || '';
   const attribute = req.query.attribute || 'hours';
+  const { weekStart, weekEnd, weekStartDate, weekEndDate } = getRequestedWeekRange(req.query.week_start);
+  const weekDisplayEnd = new Date(weekEnd);
+  weekDisplayEnd.setDate(weekDisplayEnd.getDate() - 1);
+  const previousWeekStart = new Date(weekStart);
+  previousWeekStart.setDate(previousWeekStart.getDate() - 7);
+  const nextWeekStart = new Date(weekStart);
+  nextWeekStart.setDate(nextWeekStart.getDate() + 7);
   const allowedAttributes = ['hours', 'online_tips', 'cash_tips', 'total_tips'];
   if (!allowedAttributes.includes(attribute)) return res.send('Invalid attribute selected.');
 
@@ -1328,7 +1364,7 @@ app.get('/admin/charts', requireAdmin, (req, res) => {
     .then((lr) => {
       const locations = lr.rows;
       let query = '';
-      let params = [];
+      let params = [weekStartDate, weekEndDate];
       const columnSelect =
         attribute === 'total_tips'
           ? 'COALESCE(SUM(sr.online_tips) + SUM(sr.cash_tips), 0)'
@@ -1336,29 +1372,34 @@ app.get('/admin/charts', requireAdmin, (req, res) => {
 
       if (locationFilter) {
         query = `
-          SELECT TO_CHAR(DATE(sr.shift_date AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') AS date_key, ${columnSelect} as value
+          SELECT TO_CHAR(DATE(sr.shift_date), 'YYYY-MM-DD') AS date_key, ${columnSelect} as value
           FROM shift_reports sr
-          WHERE sr.location_id = $1
-          GROUP BY DATE(sr.shift_date AT TIME ZONE 'America/New_York')
-          ORDER BY DATE(sr.shift_date AT TIME ZONE 'America/New_York') ASC
+          WHERE DATE(sr.shift_date) >= $1
+            AND DATE(sr.shift_date) < $2
+            AND sr.location_id = $3
+          GROUP BY DATE(sr.shift_date)
+          ORDER BY DATE(sr.shift_date) ASC
         `;
-        params.push(locationFilter);
+        params.push(Number(locationFilter));
       } else {
         query = `
-          SELECT TO_CHAR(DATE(sr.shift_date AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') AS date_key,
+          SELECT TO_CHAR(DATE(sr.shift_date), 'YYYY-MM-DD') AS date_key,
                  COALESCE(l.id, 0) AS location_id,
                  COALESCE(l.name, 'Unassigned') AS location_name,
                  ${columnSelect} as value
           FROM shift_reports sr
           LEFT JOIN locations l ON sr.location_id = l.id
-          GROUP BY DATE(sr.shift_date AT TIME ZONE 'America/New_York'), l.id, l.name
-          ORDER BY DATE(sr.shift_date AT TIME ZONE 'America/New_York') ASC
+          WHERE DATE(sr.shift_date) >= $1
+            AND DATE(sr.shift_date) < $2
+          GROUP BY DATE(sr.shift_date), l.id, l.name
+          ORDER BY DATE(sr.shift_date) ASC
         `;
       }
 
       return db.query(query, params).then((qr) => {
         const rows = qr.rows;
-        const labels = Array.from(new Set(rows.map((r) => r.date_key))).sort().map((d) => formatEstDateLabel(d));
+        const orderedDateKeys = Array.from(new Set(rows.map((r) => r.date_key))).sort();
+        const labels = orderedDateKeys.map((d) => formatEstDateLabel(d));
         const palette = [
           'rgba(79,140,255,0.78)',
           'rgba(31,209,195,0.78)',
@@ -1396,7 +1437,7 @@ app.get('/admin/charts', requireAdmin, (req, res) => {
             idx += 1;
             return {
               label: series.label,
-              data: Array.from(new Set(rows.map((r) => r.date_key))).sort().map((d) => series.dataByDate.get(d) || 0),
+              data: orderedDateKeys.map((d) => series.dataByDate.get(d) || 0),
               backgroundColor: color,
               borderColor: color.replace('0.78', '1'),
               borderWidth: 1
@@ -1408,7 +1449,12 @@ app.get('/admin/charts', requireAdmin, (req, res) => {
           labels,
           datasets,
           selectedLocation: locationFilter,
-          selectedAttribute: attribute
+          selectedAttribute: attribute,
+          weekStart,
+          weekDisplayEnd,
+          selectedWeekStartDate: weekStartDate,
+          previousWeekStartDate: formatDate(previousWeekStart),
+          nextWeekStartDate: formatDate(nextWeekStart)
         });
       });
     })
@@ -1422,6 +1468,13 @@ app.get('/admin/charts-compare', requireAdmin, (req, res) => {
   const locationFilter = req.query.location_id || '';
   const attribute = req.query.attribute || 'hours';
   const valetFilter = req.query.valet_id || 'all';
+  const { weekStart, weekEnd, weekStartDate, weekEndDate } = getRequestedWeekRange(req.query.week_start);
+  const weekDisplayEnd = new Date(weekEnd);
+  weekDisplayEnd.setDate(weekDisplayEnd.getDate() - 1);
+  const previousWeekStart = new Date(weekStart);
+  previousWeekStart.setDate(previousWeekStart.getDate() - 7);
+  const nextWeekStart = new Date(weekStart);
+  nextWeekStart.setDate(nextWeekStart.getDate() + 7);
   const allowedAttributes = ['hours', 'online_tips', 'cash_tips', 'total_tips'];
   if (!allowedAttributes.includes(attribute)) return res.send('Invalid attribute selected.');
 
@@ -1436,11 +1489,14 @@ app.get('/admin/charts-compare', requireAdmin, (req, res) => {
           ? 'COALESCE(SUM(sr.online_tips) + SUM(sr.cash_tips), 0) AS value'
           : `COALESCE(SUM(sr.${attribute}), 0) AS value`;
 
-      const whereClauses = [];
-      const queryParams = [];
+      const whereClauses = [
+        'DATE(sr.shift_date) >= $1',
+        'DATE(sr.shift_date) < $2'
+      ];
+      const queryParams = [weekStartDate, weekEndDate];
       if (locationFilter) {
-        whereClauses.push('sr.location_id = $1');
-        queryParams.push(locationFilter);
+        whereClauses.push(`sr.location_id = $${queryParams.length + 1}`);
+        queryParams.push(Number(locationFilter));
       }
       let groupBy = 'sr.shift_date';
       let selectUser = '';
@@ -1454,14 +1510,14 @@ app.get('/admin/charts-compare', requireAdmin, (req, res) => {
       }
       const whereSql = whereClauses.length ? 'WHERE ' + whereClauses.join(' AND ') : '';
       const query = `
-        SELECT TO_CHAR(DATE(sr.shift_date AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') AS date_key
+        SELECT TO_CHAR(DATE(sr.shift_date), 'YYYY-MM-DD') AS date_key
         ${selectUser},
         ${sumExpression}
         FROM shift_reports sr
         ${joinUser}
         ${whereSql}
-        GROUP BY ${groupBy.replace(/sr\.shift_date/g, "DATE(sr.shift_date AT TIME ZONE 'America/New_York')")}
-        ORDER BY DATE(sr.shift_date AT TIME ZONE 'America/New_York') ASC
+        GROUP BY ${groupBy.replace(/sr\.shift_date/g, 'DATE(sr.shift_date)')}
+        ORDER BY DATE(sr.shift_date) ASC
       `;
 
       return db.query(query, queryParams).then((qr) => {
@@ -1480,7 +1536,12 @@ app.get('/admin/charts-compare', requireAdmin, (req, res) => {
             selectedValet: valetFilter,
             selectedAttribute: attribute,
             labels,
-            datasets
+            datasets,
+            weekStart,
+            weekDisplayEnd,
+            selectedWeekStartDate: weekStartDate,
+            previousWeekStartDate: formatDate(previousWeekStart),
+            nextWeekStartDate: formatDate(nextWeekStart)
           });
         } else {
           const userMap = new Map();
@@ -1503,7 +1564,12 @@ app.get('/admin/charts-compare', requireAdmin, (req, res) => {
             selectedValet: 'all',
             selectedAttribute: attribute,
             labels,
-            datasets
+            datasets,
+            weekStart,
+            weekDisplayEnd,
+            selectedWeekStartDate: weekStartDate,
+            previousWeekStartDate: formatDate(previousWeekStart),
+            nextWeekStartDate: formatDate(nextWeekStart)
           });
         }
       });
