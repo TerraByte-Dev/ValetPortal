@@ -3,7 +3,7 @@
   <div>
     <p class="eyebrow">User management</p>
     <h2>Users</h2>
-    <p class="muted">Add, edit, and remove users. Removal requires typed confirmation.</p>
+    <p class="muted">Add, edit, and remove users. PINs are 4 digits. Removal requires typed confirmation.</p>
   </div>
 </section>
 
@@ -32,8 +32,8 @@
         <input type="text" id="phone" name="phone" required>
       </div>
       <div class="form-group">
-        <label for="password">Temporary password</label>
-        <input type="password" id="password" name="password" required>
+        <label for="pin">Temporary PIN</label>
+        <input type="password" id="pin" name="pin" required inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password">
       </div>
     </div>
     <div class="form-row">
@@ -61,6 +61,14 @@
 </section>
 
 <section class="card">
+  <h3>Bulk PIN reset</h3>
+  <p class="muted">For testing, you can reset every user's PIN to <strong>0000</strong>.</p>
+  <form action="/admin/users/pin-reset-all" method="POST" class="inline-form">
+    <button type="submit" class="btn btn-ghost">Reset all PINs to 0000</button>
+  </form>
+</section>
+
+<section class="card">
   <h3>Current users</h3>
   <div class="table-wrap">
     <table>
@@ -82,6 +90,10 @@
             <td><%= user.group_name || '—' %></td>
             <td>
               <div class="row-actions">
+                <form action="/admin/users/<%= user.id %>/pin" method="POST" class="inline-form">
+                  <input type="password" name="pin" placeholder="New PIN" required inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password">
+                  <button type="submit" class="btn btn-ghost">Set PIN</button>
+                </form>
                 <a href="/admin/users/edit/<%= user.id %>" class="btn btn-ghost">Edit</a>
                 <form action="/admin/users/delete/<%= user.id %>" method="POST" class="inline-form">
                   <input type="text" name="confirm_text" placeholder="Type DELETE" required>

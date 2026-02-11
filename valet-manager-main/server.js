@@ -119,6 +119,14 @@ function selectedAttributeLabel(attribute) {
   return 'Hours';
 }
 
+function normalizePinInput(value) {
+  return String(value || '').trim();
+}
+
+function isValidPin(pin) {
+  return /^\d{4}$/.test(pin);
+}
+
 function todayEstIsoDate() {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
@@ -205,18 +213,23 @@ app.get('/register', (req, res) => {
   res.render('register', { error: null });
 });
 app.post('/register', async (req, res) => {
-  const { first_name, last_initial, phone, password, confirm_password } = req.body;
-  if (!first_name || !last_initial || !phone || !password || !confirm_password) {
+  const { first_name, last_initial, phone, pin, confirm_pin, password, confirm_password } = req.body;
+  const normalizedPin = normalizePinInput(pin || password);
+  const normalizedConfirmPin = normalizePinInput(confirm_pin || confirm_password);
+  if (!first_name || !last_initial || !phone || !normalizedPin || !normalizedConfirmPin) {
     return res.render('register', { error: 'All fields are required' });
   }
-  if (password !== confirm_password) {
-    return res.render('register', { error: 'Passwords do not match' });
+  if (!isValidPin(normalizedPin)) {
+    return res.render('register', { error: 'PIN must be exactly 4 digits.' });
+  }
+  if (normalizedPin !== normalizedConfirmPin) {
+    return res.render('register', { error: 'PINs do not match' });
   }
   const cleanFirst = String(first_name).trim();
   const cleanLastInitial = String(last_initial).trim().charAt(0).toUpperCase();
   const name = `${cleanFirst} ${cleanLastInitial}.`;
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(normalizedPin, 10);
     const queryText = `
       INSERT INTO users (name, phone, password)
       VALUES ($1, $2, $3)
@@ -240,8 +253,9 @@ app.get('/login', (req, res) => {
   res.render('login', { error: null });
 });
 app.post('/login', (req, res) => {
-  const { phone, password } = req.body;
-  if (!phone || !password) {
+  const { phone, pin, password } = req.body;
+  const normalizedPin = normalizePinInput(pin || password);
+  if (!phone || !normalizedPin) {
     return res.render('login', { error: 'All fields are required' });
   }
   const queryText = 'SELECT * FROM users WHERE phone = $1';
@@ -249,7 +263,7 @@ app.post('/login', (req, res) => {
     .then(async (result) => {
       if (result.rowCount === 0) return res.render('login', { error: 'Invalid credentials' });
       const user = result.rows[0];
-      const match = await bcrypt.compare(password, user.password);
+      const match = await bcrypt.compare(normalizedPin, user.password);
       if (!match) return res.render('login', { error: 'Invalid credentials' });
       req.session.user = user;
       if (user.role === 'admin') res.redirect('/admin');
@@ -324,38 +338,60 @@ app.get('/profile', requireLogin, (req, res) => {
 });
 
 app.post('/profile', requireLogin, profileUpload.single('profile_photo'), async (req, res) => {
-  const { contact_phone, social_linkedin, bio, links, existing_photo, current_password, new_password, confirm_new_password } = req.body;
+  const {
+    contact_phone,
+    social_linkedin,
+    bio,
+    links,
+    existing_photo,
+    current_pin,
+    new_pin,
+    confirm_new_pin,
+    current_password,
+    new_password,
+    confirm_new_password
+  } = req.body;
   try {
     const currentUserRes = await db.query('SELECT * FROM users WHERE id = $1', [req.session.user.id]);
     if (!currentUserRes.rowCount) return res.redirect('/dashboard');
     const currentUser = currentUserRes.rows[0];
 
     let passwordToSave = currentUser.password;
-    const wantsPasswordChange = current_password || new_password || confirm_new_password;
-    if (wantsPasswordChange) {
-      if (!current_password || !new_password || !confirm_new_password) {
+    const currentPinInput = normalizePinInput(current_pin || current_password);
+    const newPinInput = normalizePinInput(new_pin || new_password);
+    const confirmNewPinInput = normalizePinInput(confirm_new_pin || confirm_new_password);
+    const wantsPinChange = currentPinInput || newPinInput || confirmNewPinInput;
+    if (wantsPinChange) {
+      if (!currentPinInput || !newPinInput || !confirmNewPinInput) {
         return res.render('profile', {
           userProfile: currentUser,
-          error: 'To change password, fill current password and both new password fields.',
+          error: 'To change PIN, fill current PIN and both new PIN fields.',
           message: null
         });
       }
-      if (new_password !== confirm_new_password) {
+      if (!isValidPin(newPinInput)) {
         return res.render('profile', {
           userProfile: currentUser,
-          error: 'New password confirmation does not match.',
+          error: 'New PIN must be exactly 4 digits.',
           message: null
         });
       }
-      const matchesCurrent = await bcrypt.compare(current_password, currentUser.password);
+      if (newPinInput !== confirmNewPinInput) {
+        return res.render('profile', {
+          userProfile: currentUser,
+          error: 'New PIN confirmation does not match.',
+          message: null
+        });
+      }
+      const matchesCurrent = await bcrypt.compare(currentPinInput, currentUser.password);
       if (!matchesCurrent) {
         return res.render('profile', {
           userProfile: currentUser,
-          error: 'Current password is incorrect.',
+          error: 'Current PIN is incorrect.',
           message: null
         });
       }
-      passwordToSave = await bcrypt.hash(new_password, 10);
+      passwordToSave = await bcrypt.hash(newPinInput, 10);
     }
 
     const profilePhoto = req.file ? req.file.filename : (existing_photo || null);
@@ -656,6 +692,10 @@ app.get('/admin/export', requireAdmin, (req, res) => {
 --------------------------------*/
 app.get('/admin/locations', requireAdmin, (req, res) => {
   const { weekStartDate, weekEndDate, weekStart, weekEnd } = getRequestedWeekRange(req.query.week_start);
+  const weekDisplayEnd = new Date(weekEnd);
+  weekDisplayEnd.setDate(weekDisplayEnd.getDate() - 1);
+  const previousWeekStartDate = addDaysToIsoDate(weekStartDate, -7);
+  const nextWeekStartDate = addDaysToIsoDate(weekStartDate, 7);
   const reportsQuery = `
     SELECT sr.location_id, u.name AS valet_name,
            COALESCE(SUM(sr.hours), 0) AS total_hours,
@@ -706,7 +746,10 @@ app.get('/admin/locations', requireAdmin, (req, res) => {
       res.render('admin_locations', {
         locations,
         weekStart,
-        weekEnd
+        weekDisplayEnd,
+        weekStartDate,
+        previousWeekStartDate,
+        nextWeekStartDate
       });
     })
     .catch((err) => res.send('Error retrieving location overview: ' + err.message));
@@ -950,8 +993,8 @@ app.post('/admin/delete/:id', requireAdmin, (req, res) => {
 /* ------------------------------
    Admin: Users
 --------------------------------*/
-app.get('/admin/users', requireAdmin, (req, res) => {
-  Promise.all([
+async function loadUsersAndGroups() {
+  const [users, groups] = await Promise.all([
     db.query(`
       SELECT u.*, g.name AS group_name
       FROM users u
@@ -959,78 +1002,52 @@ app.get('/admin/users', requireAdmin, (req, res) => {
       ORDER BY u.role DESC, u.name ASC
     `),
     db.query('SELECT * FROM groups ORDER BY name ASC')
-  ])
-    .then(([users, groups]) =>
-      res.render('admin_users', {
-        users: users.rows,
-        groups: groups.rows,
-        error: null,
-        message: null
-      })
-    )
+  ]);
+  return { users: users.rows, groups: groups.rows };
+}
+
+async function renderAdminUsersPage(res, error = null, message = null) {
+  const { users, groups } = await loadUsersAndGroups();
+  return res.render('admin_users', {
+    users,
+    groups,
+    error,
+    message
+  });
+}
+
+app.get('/admin/users', requireAdmin, (req, res) => {
+  renderAdminUsersPage(res)
     .catch((err) => res.send('Error retrieving users: ' + err.message));
 });
 
 app.post('/admin/users', requireAdmin, async (req, res) => {
-  const { first_name, last_initial, phone, password, role, group_id } = req.body;
-  if (!first_name || !last_initial || !phone || !password || !role) {
-    const [users, groups] = await Promise.all([
-      db.query(`
-        SELECT u.*, g.name AS group_name
-        FROM users u
-        LEFT JOIN groups g ON u.group_id = g.id
-        ORDER BY u.role DESC, u.name ASC
-      `),
-      db.query('SELECT * FROM groups ORDER BY name ASC')
-    ]);
-    return res.render('admin_users', {
-      users: users.rows,
-      groups: groups.rows,
-      error: 'All fields are required.',
-      message: null
-    });
+  const { first_name, last_initial, phone, pin, password, role, group_id } = req.body;
+  const normalizedPin = normalizePinInput(pin || password);
+  if (!first_name || !last_initial || !phone || !normalizedPin || !role) {
+    return renderAdminUsersPage(res, 'All fields are required.');
+  }
+  if (!isValidPin(normalizedPin)) {
+    return renderAdminUsersPage(res, 'PIN must be exactly 4 digits.');
   }
   const cleanFirst = String(first_name).trim();
   const cleanLastInitial = String(last_initial).trim().charAt(0).toUpperCase();
   const name = `${cleanFirst} ${cleanLastInitial}.`;
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(normalizedPin, 10);
     await db.query(
       `INSERT INTO users (name, phone, password, role, group_id)
        VALUES ($1, $2, $3, $4, $5)`,
       [name, phone, hashedPassword, role, group_id || null]
     );
-    const [users, groups] = await Promise.all([
-      db.query(`
-        SELECT u.*, g.name AS group_name
-        FROM users u
-        LEFT JOIN groups g ON u.group_id = g.id
-        ORDER BY u.role DESC, u.name ASC
-      `),
-      db.query('SELECT * FROM groups ORDER BY name ASC')
-    ]);
-    return res.render('admin_users', {
-      users: users.rows,
-      groups: groups.rows,
-      error: null,
-      message: 'User created successfully.'
-    });
+    await renderAdminUsersPage(res, null, 'User created successfully.');
+    return;
   } catch (err) {
-    const [users, groups] = await Promise.all([
-      db.query(`
-        SELECT u.*, g.name AS group_name
-        FROM users u
-        LEFT JOIN groups g ON u.group_id = g.id
-        ORDER BY u.role DESC, u.name ASC
-      `),
-      db.query('SELECT * FROM groups ORDER BY name ASC')
-    ]);
-    return res.render('admin_users', {
-      users: users.rows,
-      groups: groups.rows,
-      error: err.code === '23505' ? 'Phone number already exists.' : 'Error creating user: ' + err.message,
-      message: null
-    });
+    await renderAdminUsersPage(
+      res,
+      err.code === '23505' ? 'Phone number already exists.' : 'Error creating user: ' + err.message
+    );
+    return;
   }
 });
 
@@ -1047,39 +1064,90 @@ app.get('/admin/users/edit/:id', requireAdmin, (req, res) => {
     .catch((err) => res.send('Error loading user: ' + err.message));
 });
 
-app.post('/admin/users/edit/:id', requireAdmin, (req, res) => {
+app.post('/admin/users/edit/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { name, phone, role, group_id } = req.body;
-  const updateQuery = `
-    UPDATE users
-    SET name = $1, phone = $2, role = $3, group_id = $4
-    WHERE id = $5
-  `;
-  db.query(updateQuery, [name, phone, role, group_id || null, id])
-    .then(() => res.redirect('/admin/users'))
-    .catch((err) => res.send('Error updating user: ' + err.message));
+  const { name, phone, role, group_id, pin } = req.body;
+  const normalizedPin = normalizePinInput(pin);
+  if (normalizedPin && !isValidPin(normalizedPin)) {
+    return Promise.all([
+      db.query('SELECT * FROM users WHERE id = $1', [id]),
+      db.query('SELECT * FROM groups ORDER BY name ASC')
+    ])
+      .then(([user, groups]) => {
+        if (!user.rowCount) return res.send('User not found.');
+        return res.render('admin_user_edit', {
+          user: user.rows[0],
+          groups: groups.rows,
+          error: 'PIN must be exactly 4 digits.'
+        });
+      })
+      .catch((err) => res.send('Error loading user: ' + err.message));
+  }
+  try {
+    if (normalizedPin) {
+      const hashedPin = await bcrypt.hash(normalizedPin, 10);
+      await db.query(
+        `
+        UPDATE users
+        SET name = $1, phone = $2, role = $3, group_id = $4, password = $5
+        WHERE id = $6
+      `,
+        [name, phone, role, group_id || null, hashedPin, id]
+      );
+    } else {
+      await db.query(
+        `
+        UPDATE users
+        SET name = $1, phone = $2, role = $3, group_id = $4
+        WHERE id = $5
+      `,
+        [name, phone, role, group_id || null, id]
+      );
+    }
+    return res.redirect('/admin/users');
+  } catch (err) {
+    return res.send('Error updating user: ' + err.message);
+  }
+});
+
+app.post('/admin/users/:id/pin', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const newPin = normalizePinInput(req.body.pin);
+  if (!isValidPin(newPin)) {
+    return renderAdminUsersPage(res, 'PIN must be exactly 4 digits.');
+  }
+  try {
+    const hashedPin = await bcrypt.hash(newPin, 10);
+    const result = await db.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPin, id]);
+    if (!result.rowCount) {
+      await renderAdminUsersPage(res, 'User not found.');
+      return;
+    }
+    await renderAdminUsersPage(res, null, 'User PIN updated.');
+    return;
+  } catch (err) {
+    return res.send('Error updating user PIN: ' + err.message);
+  }
+});
+
+app.post('/admin/users/pin-reset-all', requireAdmin, async (req, res) => {
+  try {
+    const defaultPin = '0000';
+    const hashedPin = await bcrypt.hash(defaultPin, 10);
+    const result = await db.query('UPDATE users SET password = $1', [hashedPin]);
+    await renderAdminUsersPage(res, null, `Reset PIN to 0000 for ${result.rowCount} users.`);
+    return;
+  } catch (err) {
+    return res.send('Error resetting PINs: ' + err.message);
+  }
 });
 
 app.post('/admin/users/delete/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
   const { confirm_text } = req.body;
   if (confirm_text !== 'DELETE') {
-    return Promise.all([
-      db.query(`
-        SELECT u.*, g.name AS group_name
-        FROM users u
-        LEFT JOIN groups g ON u.group_id = g.id
-        ORDER BY u.role DESC, u.name ASC
-      `),
-      db.query('SELECT * FROM groups ORDER BY name ASC')
-    ]).then(([users, groups]) =>
-      res.render('admin_users', {
-        users: users.rows,
-        groups: groups.rows,
-        error: 'Type DELETE to confirm user removal.',
-        message: null
-      })
-    );
+    return renderAdminUsersPage(res, 'Type DELETE to confirm user removal.')
+      .catch((err) => res.send('Error retrieving users: ' + err.message));
   }
   db.query('DELETE FROM users WHERE id = $1', [id])
     .then(() => res.redirect('/admin/users'))

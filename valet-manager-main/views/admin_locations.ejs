@@ -1,25 +1,16 @@
 <%- include('partials/header', { title: 'Locations' }) %>
 <%
   const formatMoney = (n) => `$${(Number(n) || 0).toFixed(2)}`;
-  const weekStartDate = (() => {
-    try {
-      const d = new Date(weekStart);
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      return `${yyyy}-${mm}-${dd}`;
-    } catch (e) {
-      return '';
-    }
-  })();
 %>
 <section class="page-header">
   <div>
     <p class="eyebrow">Locations</p>
     <h2>Weekly location overview</h2>
-    <p class="muted">Week: <%= formatEstDate(weekStart) %> - <%= formatEstDate(weekEnd) %></p>
+    <p class="muted">Week: <%= formatEstDate(weekStart) %> - <%= formatEstDate(weekDisplayEnd) %> (EST)</p>
   </div>
   <div class="button-row">
+    <a href="/admin/locations?week_start=<%= previousWeekStartDate %>" class="btn btn-ghost week-arrow" aria-label="Previous week">&lt;</a>
+    <a href="/admin/locations?week_start=<%= nextWeekStartDate %>" class="btn btn-ghost week-arrow" aria-label="Next week">&gt;</a>
     <a href="/admin/locations/manage" class="btn btn-ghost">Manage Locations</a>
   </div>
 </section>
