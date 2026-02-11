@@ -112,6 +112,13 @@ function formatEstDateLabel(value) {
   return `${weekday} ${mdy}`;
 }
 
+function selectedAttributeLabel(attribute) {
+  if (attribute === 'online_tips') return 'Online Tips';
+  if (attribute === 'cash_tips') return 'Cash Tips';
+  if (attribute === 'total_tips') return 'Total Tips';
+  return 'Hours';
+}
+
 function getRequestedWeekRange(weekStartParam) {
   const baseDate = weekStartParam ? new Date(`${weekStartParam}T12:00:00`) : new Date();
   const weekStart = getValetWeekStart(baseDate);
@@ -1338,20 +1345,68 @@ app.get('/admin/charts', requireAdmin, (req, res) => {
         params.push(locationFilter);
       } else {
         query = `
-          SELECT TO_CHAR(DATE(sr.shift_date AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') AS date_key, ${columnSelect} as value
+          SELECT TO_CHAR(DATE(sr.shift_date AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') AS date_key,
+                 COALESCE(l.id, 0) AS location_id,
+                 COALESCE(l.name, 'Unassigned') AS location_name,
+                 ${columnSelect} as value
           FROM shift_reports sr
-          GROUP BY DATE(sr.shift_date AT TIME ZONE 'America/New_York')
+          LEFT JOIN locations l ON sr.location_id = l.id
+          GROUP BY DATE(sr.shift_date AT TIME ZONE 'America/New_York'), l.id, l.name
           ORDER BY DATE(sr.shift_date AT TIME ZONE 'America/New_York') ASC
         `;
       }
 
       return db.query(query, params).then((qr) => {
-        const labels = qr.rows.map((r) => formatEstDateLabel(r.date_key));
-        const dataValues = qr.rows.map((r) => r.value);
+        const rows = qr.rows;
+        const labels = Array.from(new Set(rows.map((r) => r.date_key))).sort().map((d) => formatEstDateLabel(d));
+        const palette = [
+          'rgba(79,140,255,0.78)',
+          'rgba(31,209,195,0.78)',
+          'rgba(255,176,91,0.78)',
+          'rgba(224,117,255,0.78)',
+          'rgba(255,107,107,0.78)',
+          'rgba(142,221,109,0.78)',
+          'rgba(255,214,102,0.78)',
+          'rgba(120,170,255,0.78)'
+        ];
+        let datasets = [];
+        if (locationFilter) {
+          datasets = [{
+            label: selectedAttributeLabel(attribute),
+            data: rows.map((r) => Number(r.value) || 0),
+            backgroundColor: palette[0],
+            borderColor: palette[0].replace('0.78', '1'),
+            borderWidth: 1
+          }];
+        } else {
+          const byLocation = new Map();
+          rows.forEach((row) => {
+            const lid = Number(row.location_id);
+            if (!byLocation.has(lid)) {
+              byLocation.set(lid, {
+                label: row.location_name,
+                dataByDate: new Map()
+              });
+            }
+            byLocation.get(lid).dataByDate.set(row.date_key, Number(row.value) || 0);
+          });
+          let idx = 0;
+          datasets = Array.from(byLocation.values()).map((series) => {
+            const color = palette[idx % palette.length];
+            idx += 1;
+            return {
+              label: series.label,
+              data: Array.from(new Set(rows.map((r) => r.date_key))).sort().map((d) => series.dataByDate.get(d) || 0),
+              backgroundColor: color,
+              borderColor: color.replace('0.78', '1'),
+              borderWidth: 1
+            };
+          });
+        }
         res.render('admin_charts', {
           locations,
           labels,
-          dataValues,
+          datasets,
           selectedLocation: locationFilter,
           selectedAttribute: attribute
         });
