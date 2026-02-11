@@ -1,13 +1,4 @@
 <%- include('partials/header', { title: 'Shift Reports' }) %>
-<%
-  const formatDate = (d) => {
-    try {
-      return new Date(d).toLocaleDateString('en-US');
-    } catch (e) {
-      return d;
-    }
-  };
-%>
 <section class="page-header">
   <div>
     <p class="eyebrow">Shift report page</p>
@@ -67,7 +58,7 @@
     <% } %>
     <% reports.forEach(report => { %>
       <a class="report-row" href="/admin/reports/<%= report.id %>">
-        <span><%= formatDate(report.shift_date) %></span>
+        <span><%= formatEstDate(report.shift_date) %></span>
         <span><%= report.location_name || 'Unassigned' %></span>
         <span><%= report.valet_name %> <% if (report.shift_notes) { %><span class="note-flag" title="Has shift notes">!</span><% } %></span>
         <span>$<%= Number(report.cash_tips || 0).toFixed(2) %></span>

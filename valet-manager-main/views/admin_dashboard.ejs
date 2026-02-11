@@ -1,20 +1,13 @@
 <%- include('partials/header', { title: 'Admin Overview' }) %>
-<%
-  const formatDate = (d) => {
-    try {
-      return new Date(d).toLocaleDateString('en-US');
-    } catch (e) {
-      return d;
-    }
-  };
-%>
 <section class="page-header">
   <div>
     <p class="eyebrow">Admin command center</p>
     <h2>Weekly overview</h2>
-    <p class="muted">Week: <%= formatDate(weekStart) %> - <%= formatDate(weekEnd) %></p>
+    <p class="muted">Week: <%= formatEstDate(weekStart) %> - <%= formatEstDate(weekDisplayEnd) %></p>
   </div>
   <div class="button-row">
+    <a class="btn btn-ghost week-arrow" href="/admin?week_start=<%= previousWeekStartDate %>" aria-label="Previous week">&lt;</a>
+    <a class="btn btn-ghost week-arrow" href="/admin?week_start=<%= nextWeekStartDate %>" aria-label="Next week">&gt;</a>
     <a class="btn btn-primary" href="/admin/analytics">Go to Analytics</a>
     <a class="btn btn-ghost" href="/admin/reports">Shift Report Page</a>
   </div>
@@ -52,7 +45,7 @@
     <% } %>
     <% recentReports.forEach(report => { %>
       <a class="report-row" href="/admin/reports/<%= report.id %>">
-        <span><%= formatDate(report.shift_date) %></span>
+        <span><%= formatEstDate(report.shift_date) %></span>
         <span><%= report.location_name || 'Unassigned' %></span>
         <span><%= report.valet_name %> <% if (report.shift_notes) { %><span class="note-flag" title="Has shift notes">!</span><% } %></span>
         <span>$<%= Number(report.cash_tips || 0).toFixed(2) %></span>

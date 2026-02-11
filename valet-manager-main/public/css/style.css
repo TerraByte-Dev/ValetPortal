@@ -189,6 +189,12 @@ p {
   color: #ff9b9b;
 }
 
+.week-arrow {
+  min-width: 2.25rem;
+  padding: 0.5rem 0.75rem;
+  font-weight: 700;
+}
+
 .app-footer {
   display: flex;
   align-items: center;
@@ -244,6 +250,26 @@ p {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   gap: 1.5rem;
+}
+
+.chart-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.chart-canvas-wrap {
+  position: relative;
+  width: 100%;
+  min-height: 360px;
+  height: 52vh;
+  max-height: 520px;
+  margin-bottom: 0.5rem;
+}
+
+.chart-canvas-wrap canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
 }
 
 .feed-list {
@@ -873,5 +899,10 @@ th, td {
 
   .community-layout {
     grid-template-columns: 1fr;
+  }
+
+  .chart-canvas-wrap {
+    min-height: 320px;
+    height: 44vh;
   }
 }

@@ -1,17 +1,8 @@
 <%- include('partials/header', { title: 'Shift Report Detail' }) %>
-<%
-  const formatDate = (d) => {
-    try {
-      return new Date(d).toLocaleDateString('en-US');
-    } catch (e) {
-      return d;
-    }
-  };
-%>
 <section class="page-header">
   <div>
     <p class="eyebrow">Shift report detail</p>
-    <h2><%= report.valet_name %> - <%= formatDate(report.shift_date) %></h2>
+    <h2><%= report.valet_name %> - <%= formatEstDate(report.shift_date) %></h2>
     <p class="muted"><%= report.location_name || 'Unassigned location' %></p>
   </div>
   <div class="button-row">

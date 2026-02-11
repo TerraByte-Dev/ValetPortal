@@ -1,13 +1,6 @@
 <%- include('partials/header', { title: 'Locations' }) %>
 <%
   const formatMoney = (n) => `$${(Number(n) || 0).toFixed(2)}`;
-  const formatDate = (d) => {
-    try {
-      return new Date(d).toLocaleDateString('en-US');
-    } catch (e) {
-      return d;
-    }
-  };
   const weekStartDate = (() => {
     try {
       const d = new Date(weekStart);
@@ -24,7 +17,7 @@
   <div>
     <p class="eyebrow">Locations</p>
     <h2>Weekly location overview</h2>
-    <p class="muted">Week: <%= formatDate(weekStart) %> - <%= formatDate(weekEnd) %></p>
+    <p class="muted">Week: <%= formatEstDate(weekStart) %> - <%= formatEstDate(weekEnd) %></p>
   </div>
   <div class="button-row">
     <a href="/admin/locations/manage" class="btn btn-ghost">Manage Locations</a>

@@ -1,19 +1,12 @@
 <%- include('partials/header', { title: 'Location Pay' }) %>
 <%
   const money = (n) => `$${(Number(n) || 0).toFixed(2)}`;
-  const fmtDate = (d) => {
-    try {
-      return new Date(d).toLocaleDateString('en-US');
-    } catch (e) {
-      return d;
-    }
-  };
 %>
 <section class="page-header">
   <div>
     <p class="eyebrow">Location Pay</p>
     <h2><%= location.name %></h2>
-    <p class="muted">Week: <%= fmtDate(weekStart) %> - <%= fmtDate(weekEnd) %></p>
+    <p class="muted">Week: <%= formatEstDate(weekStart) %> - <%= formatEstDate(weekEnd) %></p>
   </div>
   <div class="button-row">
     <a href="/admin/locations?week_start=<%= weekStartDate %>" class="btn btn-ghost">Back to Locations</a>

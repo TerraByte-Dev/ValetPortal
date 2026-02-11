@@ -1,70 +1,99 @@
 <%- include('partials/header', { title: 'Charts' }) %>
-<div>
-  <h2>Valet Data Charts</h2>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Analytics</p>
+    <h2>Location performance chart</h2>
+    <p class="muted">Date labels are displayed in EST.</p>
+  </div>
+  <div class="button-row">
+    <a href="/admin/charts-compare" class="btn btn-ghost">Compare Valets</a>
+    <a href="/admin" class="btn btn-ghost">Back to Admin</a>
+  </div>
+</section>
 
-  <!-- Filter Form -->
-  <form action="/admin/charts" method="GET" style="margin-bottom:1em;">
-    <label for="location_id">Filter by Location:</label>
-    <select name="location_id" id="location_id" style="margin-right:1em;">
-      <option value="">All Locations</option>
-      <% locations.forEach(loc => { %>
-        <option value="<%= loc.id %>" <%= (selectedLocation == loc.id) ? 'selected' : '' %>><%= loc.name %></option>
-      <% }) %>
-    </select>
-
-    <label for="attribute">Attribute:</label>
-    <select name="attribute" id="attribute">
-      <option value="hours" <%= (selectedAttribute === 'hours') ? 'selected' : '' %>>Hours</option>
-      <option value="online_tips" <%= (selectedAttribute === 'online_tips') ? 'selected' : '' %>>Online Tips</option>
-      <option value="cash_tips" <%= (selectedAttribute === 'cash_tips') ? 'selected' : '' %>>Cash Tips</option>
-      <option value="total_tips" <%= (selectedAttribute === 'total_tips') ? 'selected' : '' %>>Total Tips</option>
-    </select>
-
-    <button type="submit" class="btn-dark" style="margin-left:1em;">Filter</button>
+<section class="card chart-card">
+  <form action="/admin/charts" method="GET" class="filter-row">
+    <div class="form-group">
+      <label for="location_id">Location</label>
+      <select name="location_id" id="location_id">
+        <option value="">All Locations</option>
+        <% locations.forEach(loc => { %>
+          <option value="<%= loc.id %>" <%= (selectedLocation == loc.id) ? 'selected' : '' %>><%= loc.name %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="attribute">Attribute</label>
+      <select name="attribute" id="attribute">
+        <option value="hours" <%= (selectedAttribute === 'hours') ? 'selected' : '' %>>Hours</option>
+        <option value="online_tips" <%= (selectedAttribute === 'online_tips') ? 'selected' : '' %>>Online Tips</option>
+        <option value="cash_tips" <%= (selectedAttribute === 'cash_tips') ? 'selected' : '' %>>Cash Tips</option>
+        <option value="total_tips" <%= (selectedAttribute === 'total_tips') ? 'selected' : '' %>>Total Tips</option>
+      </select>
+    </div>
+    <div class="filter-actions">
+      <button type="submit" class="btn btn-primary">Apply</button>
+    </div>
   </form>
 
-  <!-- Chart Canvas -->
-  <canvas id="myChart" width="400" height="200"></canvas>
+  <div class="chart-canvas-wrap">
+    <canvas id="myChart"></canvas>
+  </div>
+</section>
 
-  <br>
-  <a href="/admin" class="btn-dark">Back to Admin Portal</a>
-</div>
-
-<!-- Include Chart.js from a CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <script>
-  // The server passed 'labels' and 'dataValues' arrays
   const labels = <%- JSON.stringify(labels) %>;
   const dataValues = <%- JSON.stringify(dataValues) %>;
 
-  // Display as bar chart for easier weekly comparison.
   const ctx = document.getElementById('myChart').getContext('2d');
-  const myChart = new Chart(ctx, {
+  new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: labels,
+      labels,
       datasets: [{
         label: '<%= selectedAttribute %>',
         data: dataValues,
-        backgroundColor: 'rgba(62,124,255, 0.55)',
-        borderColor: 'rgba(62,124,255, 1)',
-        borderWidth: 1
+        backgroundColor: 'rgba(79,140,255,0.65)',
+        borderColor: 'rgba(79,140,255,1)',
+        borderWidth: 1,
+        borderRadius: 6,
+        maxBarThickness: 44
       }]
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: {
+            color: '#e8f0ff'
+          }
+        }
+      },
       scales: {
+        x: {
+          ticks: {
+            color: '#e8f0ff',
+            maxRotation: 0,
+            autoSkip: true,
+            autoSkipPadding: 18
+          },
+          grid: {
+            color: 'rgba(232,240,255,0.12)'
+          }
+        },
         y: {
-          beginAtZero: true
+          beginAtZero: true,
+          ticks: {
+            color: '#e8f0ff'
+          },
+          grid: {
+            color: 'rgba(232,240,255,0.12)'
+          }
         }
       }
     }
   });
 </script>
-<div class="button-row">
-    <a href="/admin/charts-compare" class="btn-dark">Compare Valets (Charts)</a>
-  </div>
-  
-
 <%- include('partials/footer') %>

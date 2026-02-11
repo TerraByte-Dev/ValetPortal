@@ -68,6 +68,7 @@ app.set('views', path.join(__dirname, 'views'));
 // Make user available in all templates
 app.use((req, res, next) => {
   res.locals.user = req.session.user;
+  res.locals.formatEstDate = formatEstDateLabel;
   next();
 });
 
@@ -83,6 +84,32 @@ function requireAdmin(req, res, next) {
     return res.status(403).send('Access denied');
   }
   next();
+}
+
+function parseDateForEst(value) {
+  if (!value) return null;
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [yyyy, mm, dd] = value.split('-').map(Number);
+    return new Date(Date.UTC(yyyy, mm - 1, dd, 12, 0, 0, 0));
+  }
+  const parsed = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatEstDateLabel(value) {
+  const parsed = parseDateForEst(value);
+  if (!parsed) return '';
+  const weekday = new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    timeZone: 'America/New_York'
+  }).format(parsed).toUpperCase();
+  const mdy = new Intl.DateTimeFormat('en-US', {
+    month: 'numeric',
+    day: 'numeric',
+    year: '2-digit',
+    timeZone: 'America/New_York'
+  }).format(parsed);
+  return `${weekday} ${mdy}`;
 }
 
 function getRequestedWeekRange(weekStartParam) {
@@ -375,19 +402,21 @@ app.post('/community', requireLogin, (req, res) => {
    Admin: Reports
 --------------------------------*/
 app.get('/admin', requireAdmin, (req, res) => {
-  const weekStart = getValetWeekStart(new Date());
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekEnd.getDate() + 7);
-  const weekStartDate = formatDate(weekStart);
-  const weekEndDate = formatDate(weekEnd);
+  const { weekStart, weekEnd, weekStartDate, weekEndDate } = getRequestedWeekRange(req.query.week_start);
+  const previousWeekStart = new Date(weekStart);
+  previousWeekStart.setDate(previousWeekStart.getDate() - 7);
+  const nextWeekStart = new Date(weekStart);
+  nextWeekStart.setDate(nextWeekStart.getDate() + 7);
+  const weekDisplayEnd = new Date(weekEnd);
+  weekDisplayEnd.setDate(weekDisplayEnd.getDate() - 1);
 
   const topHoursQuery = `
     SELECT u.id, u.name, COALESCE(SUM(sr.hours), 0) AS total_hours
     FROM users u
     LEFT JOIN shift_reports sr
       ON sr.user_id = u.id
-      AND DATE(sr.shift_date) >= $1
-      AND DATE(sr.shift_date) < $2
+      AND DATE(sr.shift_date AT TIME ZONE 'America/New_York') >= $1
+      AND DATE(sr.shift_date AT TIME ZONE 'America/New_York') < $2
     WHERE u.role = 'valet'
     GROUP BY u.id
     ORDER BY total_hours DESC
@@ -400,8 +429,8 @@ app.get('/admin', requireAdmin, (req, res) => {
     FROM users u
     LEFT JOIN shift_reports sr
       ON sr.user_id = u.id
-      AND DATE(sr.shift_date) >= $1
-      AND DATE(sr.shift_date) < $2
+      AND DATE(sr.shift_date AT TIME ZONE 'America/New_York') >= $1
+      AND DATE(sr.shift_date AT TIME ZONE 'America/New_York') < $2
     WHERE u.role = 'valet'
     GROUP BY u.id
     ORDER BY total_tips DESC
@@ -426,10 +455,12 @@ app.get('/admin', requireAdmin, (req, res) => {
     .then(([topHours, topTips, recent]) => {
       res.render('admin_dashboard', {
         weekStart,
-        weekEnd,
+        weekDisplayEnd,
         topHours: topHours.rows[0] || null,
         topTips: topTips.rows[0] || null,
-        recentReports: recent.rows
+        recentReports: recent.rows,
+        previousWeekStartDate: formatDate(previousWeekStart),
+        nextWeekStartDate: formatDate(nextWeekStart)
       });
     })
     .catch((err) => res.send('Error retrieving admin dashboard: ' + err.message));
@@ -1298,24 +1329,24 @@ app.get('/admin/charts', requireAdmin, (req, res) => {
 
       if (locationFilter) {
         query = `
-          SELECT sr.shift_date as date, ${columnSelect} as value
+          SELECT TO_CHAR(DATE(sr.shift_date AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') AS date_key, ${columnSelect} as value
           FROM shift_reports sr
           WHERE sr.location_id = $1
-          GROUP BY sr.shift_date
-          ORDER BY sr.shift_date ASC
+          GROUP BY DATE(sr.shift_date AT TIME ZONE 'America/New_York')
+          ORDER BY DATE(sr.shift_date AT TIME ZONE 'America/New_York') ASC
         `;
         params.push(locationFilter);
       } else {
         query = `
-          SELECT sr.shift_date as date, ${columnSelect} as value
+          SELECT TO_CHAR(DATE(sr.shift_date AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') AS date_key, ${columnSelect} as value
           FROM shift_reports sr
-          GROUP BY sr.shift_date
-          ORDER BY sr.shift_date ASC
+          GROUP BY DATE(sr.shift_date AT TIME ZONE 'America/New_York')
+          ORDER BY DATE(sr.shift_date AT TIME ZONE 'America/New_York') ASC
         `;
       }
 
       return db.query(query, params).then((qr) => {
-        const labels = qr.rows.map((r) => r.date);
+        const labels = qr.rows.map((r) => formatEstDateLabel(r.date_key));
         const dataValues = qr.rows.map((r) => r.value);
         res.render('admin_charts', {
           locations,
@@ -1368,23 +1399,24 @@ app.get('/admin/charts-compare', requireAdmin, (req, res) => {
       }
       const whereSql = whereClauses.length ? 'WHERE ' + whereClauses.join(' AND ') : '';
       const query = `
-        SELECT sr.shift_date AS date
+        SELECT TO_CHAR(DATE(sr.shift_date AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') AS date_key
         ${selectUser},
         ${sumExpression}
         FROM shift_reports sr
         ${joinUser}
         ${whereSql}
-        GROUP BY ${groupBy}
-        ORDER BY sr.shift_date ASC
+        GROUP BY ${groupBy.replace(/sr\.shift_date/g, "DATE(sr.shift_date AT TIME ZONE 'America/New_York')")}
+        ORDER BY DATE(sr.shift_date AT TIME ZONE 'America/New_York') ASC
       `;
 
       return db.query(query, queryParams).then((qr) => {
         const rows = qr.rows;
-        const uniqueDates = Array.from(new Set(rows.map((r) => r.date))).sort();
+        const uniqueDateKeys = Array.from(new Set(rows.map((r) => r.date_key))).sort();
+        const labels = uniqueDateKeys.map((d) => formatEstDateLabel(d));
         if (valetFilter !== 'all') {
           const dataMap = new Map();
-          rows.forEach((r) => dataMap.set(r.date, r.value));
-          const dataValues = uniqueDates.map((d) => dataMap.get(d) || 0);
+          rows.forEach((r) => dataMap.set(r.date_key, r.value));
+          const dataValues = uniqueDateKeys.map((d) => dataMap.get(d) || 0);
           const datasets = [{ label: 'Valet Performance', data: dataValues }];
           return res.render('admin_charts_compare', {
             locations,
@@ -1392,7 +1424,7 @@ app.get('/admin/charts-compare', requireAdmin, (req, res) => {
             selectedLocation: locationFilter,
             selectedValet: valetFilter,
             selectedAttribute: attribute,
-            labels: uniqueDates,
+            labels,
             datasets
           });
         } else {
@@ -1402,11 +1434,11 @@ app.get('/admin/charts-compare', requireAdmin, (req, res) => {
             if (!userMap.has(uid)) {
               userMap.set(uid, { userName: r.user_name, dataMap: new Map() });
             }
-            userMap.get(uid).dataMap.set(r.date, r.value);
+            userMap.get(uid).dataMap.set(r.date_key, r.value);
           });
           const datasets = [];
           for (let [, info] of userMap.entries()) {
-            const dataArray = uniqueDates.map((d) => info.dataMap.get(d) || 0);
+            const dataArray = uniqueDateKeys.map((d) => info.dataMap.get(d) || 0);
             datasets.push({ label: info.userName, data: dataArray });
           }
           return res.render('admin_charts_compare', {
@@ -1415,7 +1447,7 @@ app.get('/admin/charts-compare', requireAdmin, (req, res) => {
             selectedLocation: locationFilter,
             selectedValet: 'all',
             selectedAttribute: attribute,
-            labels: uniqueDates,
+            labels,
             datasets
           });
         }
