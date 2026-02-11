@@ -1,0 +1,74 @@
+<%- include('partials/header', { title: 'Manage Locations' }) %>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Location settings</p>
+    <h2>Manage locations</h2>
+    <p class="muted">Create locations, set default lot fee, and remove old locations.</p>
+  </div>
+  <div class="button-row">
+    <a href="/admin/locations" class="btn btn-ghost">Back to Locations</a>
+  </div>
+</section>
+
+<section class="card">
+  <% if (error) { %>
+    <p class="alert alert-error"><%= error %></p>
+  <% } %>
+  <% if (message) { %>
+    <p class="alert alert-success"><%= message %></p>
+  <% } %>
+  <h3>Add location</h3>
+  <form action="/admin/locations/manage" method="POST" class="form-row">
+    <div class="form-group">
+      <label for="locationName">Location name</label>
+      <input type="text" id="locationName" name="locationName" required>
+    </div>
+    <div class="form-group">
+      <label for="lot_fee">Default lot fee</label>
+      <input type="number" step="0.01" id="lot_fee" name="lot_fee" value="0">
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn btn-primary">Add</button>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <h3>Existing locations</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Default lot fee</th>
+          <th>Update</th>
+          <th>Remove</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% locations.forEach(loc => { %>
+          <tr>
+            <td>
+              <form action="/admin/locations/manage/<%= loc.id %>" method="POST" class="inline-form">
+                <input type="text" name="locationName" value="<%= loc.name %>" required>
+            </td>
+            <td>
+                <input type="number" step="0.01" name="lot_fee" value="<%= Number(loc.lot_fee || 0).toFixed(2) %>">
+            </td>
+            <td>
+                <button type="submit" class="btn btn-ghost">Save</button>
+              </form>
+            </td>
+            <td>
+              <form action="/admin/locations/manage/delete/<%= loc.id %>" method="POST" class="inline-form">
+                <input type="text" name="confirm_text" placeholder="Type DELETE" required>
+                <button type="submit" class="btn btn-danger">Delete</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+<%- include('partials/footer') %>

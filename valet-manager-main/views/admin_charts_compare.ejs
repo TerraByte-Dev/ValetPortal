@@ -48,24 +48,30 @@
   // The server passed 'labels' (array of dates) and 'datasets' (array of {label, data})
   const labels = <%- JSON.stringify(labels) %>;
   const datasets = <%- JSON.stringify(datasets) %>;
+  const colors = [
+    'rgba(79,140,255,0.65)',
+    'rgba(31,209,195,0.65)',
+    'rgba(255,176,91,0.65)',
+    'rgba(224,117,255,0.65)',
+    'rgba(255,107,107,0.65)'
+  ];
 
   // We'll build out the Chart.js config
   // For multiple valets, we'll have multiple line series
   const dataConfig = {
     labels: labels,
-    datasets: datasets.map(ds => ({
+    datasets: datasets.map((ds, idx) => ({
       label: ds.label,
       data: ds.data,
-      backgroundColor: 'rgba(62,124,255, 0.2)',
-      borderColor: 'rgba(62,124,255, 1)',
-      borderWidth: 2,
-      fill: false  // set to true if you want filled areas
+      backgroundColor: colors[idx % colors.length],
+      borderColor: colors[idx % colors.length].replace('0.65', '1'),
+      borderWidth: 1
     }))
   };
 
   const ctx = document.getElementById('myChart').getContext('2d');
   const myChart = new Chart(ctx, {
-    type: 'line', // or 'bar', etc.
+    type: 'bar',
     data: dataConfig,
     options: {
       responsive: true,

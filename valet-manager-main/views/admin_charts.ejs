@@ -38,19 +38,18 @@
   const labels = <%- JSON.stringify(labels) %>;
   const dataValues = <%- JSON.stringify(dataValues) %>;
 
-  // Example: We'll display a line chart
+  // Display as bar chart for easier weekly comparison.
   const ctx = document.getElementById('myChart').getContext('2d');
   const myChart = new Chart(ctx, {
-    type: 'line',  // or 'bar', 'pie', etc.
+    type: 'bar',
     data: {
       labels: labels,
       datasets: [{
         label: '<%= selectedAttribute %>',
         data: dataValues,
-        backgroundColor: 'rgba(62,124,255, 0.2)',
+        backgroundColor: 'rgba(62,124,255, 0.55)',
         borderColor: 'rgba(62,124,255, 1)',
-        borderWidth: 2,
-        fill: true,
+        borderWidth: 1
       }]
     },
     options: {

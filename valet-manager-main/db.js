@@ -38,7 +38,8 @@ async function waitForDbAndCreateTables(maxRetries = 15, baseDelayMs = 700) {
   const createLocations = `
     CREATE TABLE IF NOT EXISTS locations (
       id SERIAL PRIMARY KEY,
-      name TEXT NOT NULL
+      name TEXT NOT NULL,
+      lot_fee REAL NOT NULL DEFAULT 0
     );
   `;
 
@@ -70,7 +71,30 @@ async function waitForDbAndCreateTables(maxRetries = 15, baseDelayMs = 700) {
       online_tips REAL NOT NULL DEFAULT 0,
       cash_tips REAL NOT NULL DEFAULT 0,
       cars INTEGER NOT NULL DEFAULT 0,
+      shift_notes TEXT,
       location_id INTEGER REFERENCES locations(id)
+    );
+  `;
+
+  const createLocationWeeklyFees = `
+    CREATE TABLE IF NOT EXISTS location_weekly_fees (
+      id SERIAL PRIMARY KEY,
+      location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+      week_start_date DATE NOT NULL,
+      lot_fee_amount REAL NOT NULL DEFAULT 0,
+      UNIQUE (location_id, week_start_date)
+    );
+  `;
+
+  const createLocationPayAllocations = `
+    CREATE TABLE IF NOT EXISTS location_pay_allocations (
+      id SERIAL PRIMARY KEY,
+      location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+      week_start_date DATE NOT NULL,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      allocated_amount REAL NOT NULL DEFAULT 0,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (location_id, week_start_date, user_id)
     );
   `;
 
@@ -95,6 +119,8 @@ async function waitForDbAndCreateTables(maxRetries = 15, baseDelayMs = 700) {
       await pool.query(createCommunityMessages);
       await pool.query(createShiftReports);
       await pool.query(createShiftScreenshots);
+      await pool.query(createLocationWeeklyFees);
+      await pool.query(createLocationPayAllocations);
 
       // Backfill new columns if upgrading from older schema
       await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS group_id INTEGER`);
@@ -106,6 +132,8 @@ async function waitForDbAndCreateTables(maxRetries = 15, baseDelayMs = 700) {
       await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS social_x TEXT`);
       await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT`);
       await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS links TEXT`);
+      await pool.query(`ALTER TABLE locations ADD COLUMN IF NOT EXISTS lot_fee REAL NOT NULL DEFAULT 0`);
+      await pool.query(`ALTER TABLE shift_reports ADD COLUMN IF NOT EXISTS shift_notes TEXT`);
 
       await pool.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS visible_in_sidebar BOOLEAN DEFAULT TRUE`);
       await pool.query(`UPDATE groups SET visible_in_sidebar = TRUE WHERE visible_in_sidebar IS NULL`);

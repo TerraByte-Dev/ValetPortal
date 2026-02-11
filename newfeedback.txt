@@ -1,0 +1,13 @@
+"Locations" in admin view should be changed, the page should show big box containers for each location, the boxes should show location name, weekly sums (cash and digital total), weekly valet names+hours and car totals.  The current Locations page functionality (adding and removing locations) should be moved to a "Manage Locations" button within the new Locations page, probably top right. Boxes should be able to be clicked to display data by location.
+
+I am not a huge fan of the graphs. I think the line graph approuch is a little hard to read because of the slopes, I think a bar graph would be better for the graphs we have currently.
+
+The Top Valet (Hours + $) of the week on the admin view homepage doesnt seem to be updating.
+
+Add additional "Shift Notes" input field on the shift submission forms, will need to reconfigure db probably... Full notes dont need to show in most tables (like overview), but if there is a notes in the shift report, it should be annotated with a yellow "!" to show there is a note to be read.
+
+Add a Pay page for the new Locations page in AdminView inside the new boxes that has location weekly totals shown, the employees that worked and their hours. This tool has an "AutoSplit Pay" button that divides the money across the valets evenly. The weekly sum should be changing as funds are allocated to valets. each location has a weekly "Lot Fee" that needs to be payed as well, it should be fixed, but sometimes is variable to make up for previous weeks if they didnt make money for lot fee.
+
+This Lot fee should be customizable in the new locations page, and displayed when clicked on the locations box, is editable and savable.
+
+Users registering should have to put their password in 2 different fields to make sure there are no typos in their password. I make a type on 2 accounts and couldnt get in. Also users should be able to change their password in their profile.

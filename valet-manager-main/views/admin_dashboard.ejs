@@ -54,7 +54,7 @@
       <a class="report-row" href="/admin/reports/<%= report.id %>">
         <span><%= formatDate(report.shift_date) %></span>
         <span><%= report.location_name || 'Unassigned' %></span>
-        <span><%= report.valet_name %></span>
+        <span><%= report.valet_name %> <% if (report.shift_notes) { %><span class="note-flag" title="Has shift notes">!</span><% } %></span>
         <span>$<%= Number(report.cash_tips || 0).toFixed(2) %></span>
         <span>$<%= Number(report.online_tips || 0).toFixed(2) %></span>
       </a>

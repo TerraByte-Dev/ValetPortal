@@ -50,6 +50,15 @@
 </section>
 
 <section class="card">
+  <h3>Shift Notes</h3>
+  <% if (report.shift_notes) { %>
+    <p><%= report.shift_notes %></p>
+  <% } else { %>
+    <p class="muted">No notes attached.</p>
+  <% } %>
+</section>
+
+<section class="card">
   <h3>Screenshots</h3>
   <% if (!screenshots.length) { %>
     <p class="muted">No screenshots attached.</p>

@@ -1,56 +1,80 @@
-<%- include('partials/header', { title: 'Manage Locations' }) %>
+<%- include('partials/header', { title: 'Locations' }) %>
+<%
+  const formatMoney = (n) => `$${(Number(n) || 0).toFixed(2)}`;
+  const formatDate = (d) => {
+    try {
+      return new Date(d).toLocaleDateString('en-US');
+    } catch (e) {
+      return d;
+    }
+  };
+  const weekStartDate = (() => {
+    try {
+      const d = new Date(weekStart);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    } catch (e) {
+      return '';
+    }
+  })();
+%>
 <section class="page-header">
   <div>
-    <p class="eyebrow">Location management</p>
-    <h2>Locations</h2>
-    <p class="muted">Removal requires typed confirmation.</p>
+    <p class="eyebrow">Locations</p>
+    <h2>Weekly location overview</h2>
+    <p class="muted">Week: <%= formatDate(weekStart) %> - <%= formatDate(weekEnd) %></p>
+  </div>
+  <div class="button-row">
+    <a href="/admin/locations/manage" class="btn btn-ghost">Manage Locations</a>
   </div>
 </section>
 
-<section class="card">
-  <% if (error) { %>
-    <p class="alert alert-error"><%= error %></p>
-  <% } %>
-  <% if (message) { %>
-    <p class="alert alert-success"><%= message %></p>
-  <% } %>
-  <form action="/admin/locations" method="POST">
-    <div class="form-row">
-      <div class="form-group">
-        <label for="locationName">Add new location</label>
-        <input type="text" id="locationName" name="locationName" required>
-      </div>
-      <div class="btn-row">
-        <button type="submit" class="btn btn-primary">Add location</button>
-      </div>
+<section class="location-grid">
+  <% if (!locations.length) { %>
+    <div class="card empty-state">
+      <h3>No locations yet</h3>
+      <p class="muted">Add one from Manage Locations to start tracking weekly totals.</p>
     </div>
-  </form>
-</section>
-
-<section class="card">
-  <h3>Existing locations</h3>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% locations.forEach(loc => { %>
-          <tr>
-            <td><%= loc.name %></td>
-            <td>
-              <form action="/admin/locations/delete/<%= loc.id %>" method="POST" class="inline-form">
-                <input type="text" name="confirm_text" placeholder="Type DELETE" required>
-                <button type="submit" class="btn btn-danger">Remove</button>
-              </form>
-            </td>
-          </tr>
+  <% } %>
+  <% locations.forEach(loc => { %>
+    <a class="location-card" href="/admin/locations/<%= loc.id %>/pay?week_start=<%= weekStartDate %>">
+      <div class="location-card-head">
+        <h3><%= loc.name %></h3>
+        <span class="pill">Lot fee: <%= formatMoney(loc.lot_fee) %></span>
+      </div>
+      <div class="location-metrics">
+        <div>
+          <span class="muted">Cash</span>
+          <strong><%= formatMoney(loc.total_cash) %></strong>
+        </div>
+        <div>
+          <span class="muted">Digital</span>
+          <strong><%= formatMoney(loc.total_online) %></strong>
+        </div>
+        <div>
+          <span class="muted">Hours</span>
+          <strong><%= Number(loc.total_hours || 0).toFixed(1) %></strong>
+        </div>
+        <div>
+          <span class="muted">Cars</span>
+          <strong><%= Number(loc.total_cars || 0) %></strong>
+        </div>
+      </div>
+      <div class="location-valets">
+        <h4>Valets & hours</h4>
+        <% if (!loc.valets.length) { %>
+          <p class="muted">No shifts this week.</p>
+        <% } %>
+        <% loc.valets.forEach(v => { %>
+          <div class="location-valet-row">
+            <span><%= v.name %></span>
+            <span><%= Number(v.hours || 0).toFixed(1) %>h</span>
+          </div>
         <% }) %>
-      </tbody>
-    </table>
-  </div>
+      </div>
+    </a>
+  <% }) %>
 </section>
 <%- include('partials/footer') %>

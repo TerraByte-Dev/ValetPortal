@@ -324,6 +324,67 @@ p {
   border: 1px solid var(--border);
 }
 
+.location-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.location-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  color: inherit;
+  display: grid;
+  gap: 0.9rem;
+  box-shadow: var(--shadow);
+}
+
+.location-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.location-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.location-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.location-metrics > div {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+}
+
+.location-valets {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.location-valets h4 {
+  margin: 0;
+}
+
+.location-valet-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.92rem;
+}
+
 .pricing-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -648,6 +709,20 @@ th, td {
   border-radius: 999px;
   background: var(--surface-muted);
   font-size: 0.75rem;
+}
+
+.note-flag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: #ffcc3d;
+  color: #101828;
+  font-weight: 700;
+  font-size: 0.72rem;
+  margin-left: 0.2rem;
 }
 
 .report-header {

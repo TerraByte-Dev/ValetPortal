@@ -1,0 +1,99 @@
+<%- include('partials/header', { title: 'Location Pay' }) %>
+<%
+  const money = (n) => `$${(Number(n) || 0).toFixed(2)}`;
+  const fmtDate = (d) => {
+    try {
+      return new Date(d).toLocaleDateString('en-US');
+    } catch (e) {
+      return d;
+    }
+  };
+%>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Location Pay</p>
+    <h2><%= location.name %></h2>
+    <p class="muted">Week: <%= fmtDate(weekStart) %> - <%= fmtDate(weekEnd) %></p>
+  </div>
+  <div class="button-row">
+    <a href="/admin/locations?week_start=<%= weekStartDate %>" class="btn btn-ghost">Back to Locations</a>
+  </div>
+</section>
+
+<section class="stat-strip">
+  <div class="stat-card">
+    <p class="stat-label">Gross total</p>
+    <strong><%= money(grossTotal) %></strong>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Lot fee</p>
+    <strong><%= money(weeklyLotFee) %></strong>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Distributable</p>
+    <strong><%= money(distributable) %></strong>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Remaining</p>
+    <strong><%= money(remaining) %></strong>
+  </div>
+</section>
+
+<section class="card">
+  <h3>Weekly lot fee override</h3>
+  <form action="/admin/locations/<%= location.id %>/pay/lot-fee" method="POST" class="inline-form">
+    <input type="hidden" name="week_start" value="<%= weekStartDate %>">
+    <label for="lot_fee_amount">Lot fee for this week</label>
+    <input type="number" id="lot_fee_amount" name="lot_fee_amount" step="0.01" value="<%= Number(weeklyLotFee || 0).toFixed(2) %>">
+    <button type="submit" class="btn btn-primary">Save fee</button>
+  </form>
+</section>
+
+<section class="card">
+  <div class="card-header">
+    <h3>Employee allocations</h3>
+    <form action="/admin/locations/<%= location.id %>/pay/autosplit" method="POST">
+      <input type="hidden" name="week_start" value="<%= weekStartDate %>">
+      <button type="submit" class="btn btn-ghost">AutoSplit Pay</button>
+    </form>
+  </div>
+
+  <form action="/admin/locations/<%= location.id %>/pay" method="POST">
+    <input type="hidden" name="week_start" value="<%= weekStartDate %>">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Valet</th>
+            <th>Hours</th>
+            <th>Cash</th>
+            <th>Digital</th>
+            <th>Allocated pay</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (!valets.length) { %>
+            <tr>
+              <td colspan="5">No shifts for this location in the selected week.</td>
+            </tr>
+          <% } %>
+          <% valets.forEach(v => { %>
+            <tr>
+              <td><%= v.name %></td>
+              <td><%= Number(v.total_hours || 0).toFixed(1) %></td>
+              <td><%= money(v.total_cash) %></td>
+              <td><%= money(v.total_online) %></td>
+              <td>
+                <input type="number" step="0.01" name="alloc_<%= v.user_id %>" value="<%= Number(v.allocated_amount || 0).toFixed(2) %>">
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn btn-primary">Save allocations</button>
+    </div>
+  </form>
+</section>
+<%- include('partials/footer') %>

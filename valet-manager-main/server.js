@@ -85,6 +85,19 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+function getRequestedWeekRange(weekStartParam) {
+  const baseDate = weekStartParam ? new Date(`${weekStartParam}T12:00:00`) : new Date();
+  const weekStart = getValetWeekStart(baseDate);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  return {
+    weekStart,
+    weekEnd,
+    weekStartDate: formatDate(weekStart),
+    weekEndDate: formatDate(weekEnd)
+  };
+}
+
 /* ------------------------------
    Multer (File Uploads)
 --------------------------------*/
@@ -129,9 +142,12 @@ app.get('/register', (req, res) => {
   res.render('register', { error: null });
 });
 app.post('/register', async (req, res) => {
-  const { first_name, last_initial, phone, password } = req.body;
-  if (!first_name || !last_initial || !phone || !password) {
+  const { first_name, last_initial, phone, password, confirm_password } = req.body;
+  if (!first_name || !last_initial || !phone || !password || !confirm_password) {
     return res.render('register', { error: 'All fields are required' });
+  }
+  if (password !== confirm_password) {
+    return res.render('register', { error: 'Passwords do not match' });
   }
   const cleanFirst = String(first_name).trim();
   const cleanLastInitial = String(last_initial).trim().charAt(0).toUpperCase();
@@ -196,17 +212,26 @@ app.get('/dashboard', requireLogin, (req, res) => {
 });
 
 app.post('/dashboard', requireLogin, upload.array('screenshots', 10), (req, res) => {
-  const { shift_date, hours, online_tips, cash_tips, location_id, cars } = req.body;
+  const { shift_date, hours, online_tips, cash_tips, location_id, cars, shift_notes } = req.body;
   if (!shift_date || online_tips === undefined || cash_tips === undefined || !location_id) {
     return res.render('dashboard', { error: 'All fields are required', message: null, locations: [] });
   }
   const hoursValue = hours ? Number(hours) : 0;
   const carsValue = cars ? Number(cars) : 0;
   const insertQuery = `
-    INSERT INTO shift_reports (user_id, shift_date, hours, online_tips, cash_tips, location_id, cars)
-    VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id
+    INSERT INTO shift_reports (user_id, shift_date, hours, online_tips, cash_tips, location_id, cars, shift_notes)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id
   `;
-  db.query(insertQuery, [req.session.user.id, shift_date, hoursValue, online_tips, cash_tips, location_id, carsValue])
+  db.query(insertQuery, [
+    req.session.user.id,
+    shift_date,
+    hoursValue,
+    online_tips,
+    cash_tips,
+    location_id,
+    carsValue,
+    shift_notes ? String(shift_notes).trim() : null
+  ])
     .then((result) => {
       const shiftReportId = result.rows[0].id;
       if (req.files && req.files.length > 0) {
@@ -235,40 +260,71 @@ app.get('/profile', requireLogin, (req, res) => {
     .catch((err) => res.render('profile', { userProfile: req.session.user, error: err.message, message: null }));
 });
 
-app.post('/profile', requireLogin, profileUpload.single('profile_photo'), (req, res) => {
-  const {
-    contact_phone,
-    social_linkedin,
-    bio,
-    links,
-    existing_photo
-  } = req.body;
-  const profilePhoto = req.file ? req.file.filename : (existing_photo || null);
-  const updateQuery = `
-    UPDATE users
-    SET profile_photo_url = $1,
-        contact_phone = $2,
-        social_linkedin = $3,
-        bio = $4,
-        links = $5
-    WHERE id = $6
-    RETURNING *
-  `;
-  db.query(updateQuery, [
-    profilePhoto,
-    contact_phone || null,
-    social_linkedin || null,
-    bio || null,
-    links || null,
-    req.session.user.id
-  ])
-    .then((r) => {
-      if (r.rowCount) req.session.user = r.rows[0];
-      res.render('profile', { userProfile: r.rows[0], error: null, message: 'Profile updated.' });
-    })
-    .catch((err) =>
-      res.render('profile', { userProfile: req.session.user, error: 'Error updating profile: ' + err.message, message: null })
-    );
+app.post('/profile', requireLogin, profileUpload.single('profile_photo'), async (req, res) => {
+  const { contact_phone, social_linkedin, bio, links, existing_photo, current_password, new_password, confirm_new_password } = req.body;
+  try {
+    const currentUserRes = await db.query('SELECT * FROM users WHERE id = $1', [req.session.user.id]);
+    if (!currentUserRes.rowCount) return res.redirect('/dashboard');
+    const currentUser = currentUserRes.rows[0];
+
+    let passwordToSave = currentUser.password;
+    const wantsPasswordChange = current_password || new_password || confirm_new_password;
+    if (wantsPasswordChange) {
+      if (!current_password || !new_password || !confirm_new_password) {
+        return res.render('profile', {
+          userProfile: currentUser,
+          error: 'To change password, fill current password and both new password fields.',
+          message: null
+        });
+      }
+      if (new_password !== confirm_new_password) {
+        return res.render('profile', {
+          userProfile: currentUser,
+          error: 'New password confirmation does not match.',
+          message: null
+        });
+      }
+      const matchesCurrent = await bcrypt.compare(current_password, currentUser.password);
+      if (!matchesCurrent) {
+        return res.render('profile', {
+          userProfile: currentUser,
+          error: 'Current password is incorrect.',
+          message: null
+        });
+      }
+      passwordToSave = await bcrypt.hash(new_password, 10);
+    }
+
+    const profilePhoto = req.file ? req.file.filename : (existing_photo || null);
+    const updateQuery = `
+      UPDATE users
+      SET profile_photo_url = $1,
+          contact_phone = $2,
+          social_linkedin = $3,
+          bio = $4,
+          links = $5,
+          password = $6
+      WHERE id = $7
+      RETURNING *
+    `;
+    const updatedRes = await db.query(updateQuery, [
+      profilePhoto,
+      contact_phone || null,
+      social_linkedin || null,
+      bio || null,
+      links || null,
+      passwordToSave,
+      req.session.user.id
+    ]);
+    if (updatedRes.rowCount) req.session.user = updatedRes.rows[0];
+    return res.render('profile', { userProfile: updatedRes.rows[0], error: null, message: 'Profile updated.' });
+  } catch (err) {
+    return res.render('profile', {
+      userProfile: req.session.user,
+      error: 'Error updating profile: ' + err.message,
+      message: null
+    });
+  }
 });
 
 app.get('/messages', requireLogin, (req, res) => {
@@ -322,14 +378,16 @@ app.get('/admin', requireAdmin, (req, res) => {
   const weekStart = getValetWeekStart(new Date());
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 7);
+  const weekStartDate = formatDate(weekStart);
+  const weekEndDate = formatDate(weekEnd);
 
   const topHoursQuery = `
     SELECT u.id, u.name, COALESCE(SUM(sr.hours), 0) AS total_hours
     FROM users u
     LEFT JOIN shift_reports sr
       ON sr.user_id = u.id
-      AND sr.shift_date >= $1
-      AND sr.shift_date < $2
+      AND DATE(sr.shift_date) >= $1
+      AND DATE(sr.shift_date) < $2
     WHERE u.role = 'valet'
     GROUP BY u.id
     ORDER BY total_hours DESC
@@ -342,8 +400,8 @@ app.get('/admin', requireAdmin, (req, res) => {
     FROM users u
     LEFT JOIN shift_reports sr
       ON sr.user_id = u.id
-      AND sr.shift_date >= $1
-      AND sr.shift_date < $2
+      AND DATE(sr.shift_date) >= $1
+      AND DATE(sr.shift_date) < $2
     WHERE u.role = 'valet'
     GROUP BY u.id
     ORDER BY total_tips DESC
@@ -351,7 +409,7 @@ app.get('/admin', requireAdmin, (req, res) => {
   `;
 
   const recentQuery = `
-    SELECT sr.id, sr.shift_date, sr.online_tips, sr.cash_tips,
+    SELECT sr.id, sr.shift_date, sr.online_tips, sr.cash_tips, sr.shift_notes,
            u.name AS valet_name, l.name AS location_name
     FROM shift_reports sr
     JOIN users u ON sr.user_id = u.id
@@ -361,8 +419,8 @@ app.get('/admin', requireAdmin, (req, res) => {
   `;
 
   Promise.all([
-    db.query(topHoursQuery, [weekStart, weekEnd]),
-    db.query(topTipsQuery, [weekStart, weekEnd]),
+    db.query(topHoursQuery, [weekStartDate, weekEndDate]),
+    db.query(topTipsQuery, [weekStartDate, weekEndDate]),
     db.query(recentQuery)
   ])
     .then(([topHours, topTips, recent]) => {
@@ -392,7 +450,7 @@ app.get('/admin/reports', requireAdmin, (req, res) => {
   const orderBy = sortMap[sort] || sortMap.recent;
 
   let query = `
-    SELECT sr.id, sr.shift_date, sr.online_tips, sr.cash_tips,
+    SELECT sr.id, sr.shift_date, sr.online_tips, sr.cash_tips, sr.shift_notes,
            u.name AS valet_name, l.name AS location_name
     FROM shift_reports sr
     JOIN users u ON sr.user_id = u.id
@@ -476,13 +534,13 @@ app.get('/admin/edit/:id', requireAdmin, (req, res) => {
 
 app.post('/admin/edit/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
-  const { shift_date, hours, cars, online_tips, cash_tips } = req.body;
+  const { shift_date, hours, cars, online_tips, cash_tips, shift_notes } = req.body;
   const updateQuery = `
     UPDATE shift_reports
-    SET shift_date = $1, hours = $2, cars = $3, online_tips = $4, cash_tips = $5
-    WHERE id = $6
+    SET shift_date = $1, hours = $2, cars = $3, online_tips = $4, cash_tips = $5, shift_notes = $6
+    WHERE id = $7
   `;
-  db.query(updateQuery, [shift_date, hours, cars, online_tips, cash_tips, id])
+  db.query(updateQuery, [shift_date, hours, cars, online_tips, cash_tips, shift_notes || null, id])
     .then(() => res.redirect('/admin/reports'))
     .catch((err) => res.send('Error updating shift report: ' + err.message));
 });
@@ -530,34 +588,101 @@ app.get('/admin/export', requireAdmin, (req, res) => {
    Admin: Locations
 --------------------------------*/
 app.get('/admin/locations', requireAdmin, (req, res) => {
-  db.query('SELECT * FROM locations')
-    .then((r) => res.render('admin_locations', { locations: r.rows, error: null, message: null }))
+  const { weekStartDate, weekEndDate, weekStart, weekEnd } = getRequestedWeekRange(req.query.week_start);
+  const reportsQuery = `
+    SELECT sr.location_id, u.name AS valet_name,
+           COALESCE(SUM(sr.hours), 0) AS total_hours,
+           COALESCE(SUM(sr.cars), 0) AS total_cars,
+           COALESCE(SUM(sr.cash_tips), 0) AS total_cash,
+           COALESCE(SUM(sr.online_tips), 0) AS total_online
+    FROM shift_reports sr
+    JOIN users u ON sr.user_id = u.id
+    WHERE DATE(sr.shift_date) >= $1
+      AND DATE(sr.shift_date) < $2
+    GROUP BY sr.location_id, u.name
+    ORDER BY u.name ASC
+  `;
+
+  Promise.all([
+    db.query('SELECT * FROM locations ORDER BY name ASC'),
+    db.query(reportsQuery, [weekStartDate, weekEndDate])
+  ])
+    .then(([locationsRes, reportsRes]) => {
+      const locations = locationsRes.rows.map((loc) => ({
+        id: loc.id,
+        name: loc.name,
+        lot_fee: Number(loc.lot_fee) || 0,
+        total_hours: 0,
+        total_cars: 0,
+        total_cash: 0,
+        total_online: 0,
+        valets: []
+      }));
+      const byLocation = new Map(locations.map((l) => [l.id, l]));
+      reportsRes.rows.forEach((row) => {
+        const summary = byLocation.get(row.location_id);
+        if (!summary) return;
+        const hours = Number(row.total_hours) || 0;
+        const cars = Number(row.total_cars) || 0;
+        const cash = Number(row.total_cash) || 0;
+        const online = Number(row.total_online) || 0;
+        summary.total_hours += hours;
+        summary.total_cars += cars;
+        summary.total_cash += cash;
+        summary.total_online += online;
+        summary.valets.push({
+          name: row.valet_name,
+          hours
+        });
+      });
+      locations.forEach((loc) => loc.valets.sort((a, b) => b.hours - a.hours));
+      res.render('admin_locations', {
+        locations,
+        weekStart,
+        weekEnd
+      });
+    })
+    .catch((err) => res.send('Error retrieving location overview: ' + err.message));
+});
+
+app.get('/admin/locations/manage', requireAdmin, (req, res) => {
+  db.query('SELECT * FROM locations ORDER BY name ASC')
+    .then((r) => res.render('admin_locations_manage', { locations: r.rows, error: null, message: null }))
     .catch((err) => res.send('Error retrieving locations: ' + err.message));
 });
 
-app.post('/admin/locations', requireAdmin, (req, res) => {
-  const { locationName } = req.body;
+app.post('/admin/locations/manage', requireAdmin, (req, res) => {
+  const { locationName, lot_fee } = req.body;
   if (!locationName) {
     return db
-      .query('SELECT * FROM locations')
-      .then((r) => res.render('admin_locations', { locations: r.rows, error: 'Location name is required', message: null }));
+      .query('SELECT * FROM locations ORDER BY name ASC')
+      .then((r) => res.render('admin_locations_manage', { locations: r.rows, error: 'Location name is required.', message: null }));
   }
-  db.query('INSERT INTO locations (name) VALUES ($1)', [locationName])
-    .then(() => db.query('SELECT * FROM locations'))
-    .then((r) => res.render('admin_locations', { locations: r.rows, error: null, message: 'Location added successfully!' }))
+  db.query('INSERT INTO locations (name, lot_fee) VALUES ($1, $2)', [locationName, Number(lot_fee) || 0])
+    .then(() => db.query('SELECT * FROM locations ORDER BY name ASC'))
+    .then((r) => res.render('admin_locations_manage', { locations: r.rows, error: null, message: 'Location added.' }))
     .catch((err) =>
-      res.render('admin_locations', { locations: [], error: 'Error adding/retrieving location: ' + err.message, message: null })
+      res.render('admin_locations_manage', { locations: [], error: 'Error adding location: ' + err.message, message: null })
     );
 });
 
-app.post('/admin/locations/delete/:id', requireAdmin, (req, res) => {
+app.post('/admin/locations/manage/:id', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const { locationName, lot_fee } = req.body;
+  if (!locationName) return res.redirect('/admin/locations/manage');
+  db.query('UPDATE locations SET name = $1, lot_fee = $2 WHERE id = $3', [locationName, Number(lot_fee) || 0, id])
+    .then(() => res.redirect('/admin/locations/manage'))
+    .catch((err) => res.send('Error updating location: ' + err.message));
+});
+
+app.post('/admin/locations/manage/delete/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
   const { confirm_text } = req.body;
   if (confirm_text !== 'DELETE') {
     return db
-      .query('SELECT * FROM locations')
+      .query('SELECT * FROM locations ORDER BY name ASC')
       .then((r) =>
-        res.render('admin_locations', {
+        res.render('admin_locations_manage', {
           locations: r.rows,
           error: 'Type DELETE to confirm location removal.',
           message: null
@@ -565,11 +690,184 @@ app.post('/admin/locations/delete/:id', requireAdmin, (req, res) => {
       );
   }
   db.query('DELETE FROM locations WHERE id = $1', [id])
-    .then(() => db.query('SELECT * FROM locations'))
-    .then((r) => res.render('admin_locations', { locations: r.rows, error: null, message: 'Location removed.' }))
+    .then(() => db.query('SELECT * FROM locations ORDER BY name ASC'))
+    .then((r) => res.render('admin_locations_manage', { locations: r.rows, error: null, message: 'Location removed.' }))
     .catch((err) =>
-      res.render('admin_locations', { locations: [], error: 'Error removing location: ' + err.message, message: null })
+      res.render('admin_locations_manage', { locations: [], error: 'Error removing location: ' + err.message, message: null })
     );
+});
+
+app.get('/admin/locations/:id/pay', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const { weekStartDate, weekEndDate, weekStart, weekEnd } = getRequestedWeekRange(req.query.week_start);
+
+  const valetsQuery = `
+    SELECT sr.user_id, u.name,
+           COALESCE(SUM(sr.hours), 0) AS total_hours,
+           COALESCE(SUM(sr.cash_tips), 0) AS total_cash,
+           COALESCE(SUM(sr.online_tips), 0) AS total_online
+    FROM shift_reports sr
+    JOIN users u ON sr.user_id = u.id
+    WHERE sr.location_id = $1
+      AND DATE(sr.shift_date) >= $2
+      AND DATE(sr.shift_date) < $3
+    GROUP BY sr.user_id, u.name
+    ORDER BY u.name ASC
+  `;
+
+  Promise.all([
+    db.query('SELECT * FROM locations WHERE id = $1', [id]),
+    db.query(valetsQuery, [id, weekStartDate, weekEndDate]),
+    db.query('SELECT user_id, allocated_amount FROM location_pay_allocations WHERE location_id = $1 AND week_start_date = $2', [id, weekStartDate]),
+    db.query('SELECT lot_fee_amount FROM location_weekly_fees WHERE location_id = $1 AND week_start_date = $2', [id, weekStartDate])
+  ])
+    .then(([locationRes, valetsRes, allocationsRes, weeklyFeeRes]) => {
+      if (!locationRes.rowCount) return res.send('Location not found.');
+      const location = locationRes.rows[0];
+      const weeklyLotFee = weeklyFeeRes.rowCount ? Number(weeklyFeeRes.rows[0].lot_fee_amount) : Number(location.lot_fee || 0);
+      const allocationMap = new Map(allocationsRes.rows.map((row) => [Number(row.user_id), Number(row.allocated_amount) || 0]));
+      const valets = valetsRes.rows.map((row) => ({
+        user_id: Number(row.user_id),
+        name: row.name,
+        total_hours: Number(row.total_hours) || 0,
+        total_cash: Number(row.total_cash) || 0,
+        total_online: Number(row.total_online) || 0,
+        allocated_amount: allocationMap.get(Number(row.user_id)) || 0
+      }));
+      const grossTotal = valets.reduce((sum, v) => sum + v.total_cash + v.total_online, 0);
+      const allocatedTotal = valets.reduce((sum, v) => sum + v.allocated_amount, 0);
+      const distributable = Math.max(0, grossTotal - weeklyLotFee);
+      const remaining = distributable - allocatedTotal;
+      return res.render('admin_location_pay', {
+        location,
+        valets,
+        weekStart,
+        weekEnd,
+        weekStartDate,
+        grossTotal,
+        weeklyLotFee,
+        distributable,
+        allocatedTotal,
+        remaining
+      });
+    })
+    .catch((err) => res.send('Error loading location pay page: ' + err.message));
+});
+
+app.post('/admin/locations/:id/pay/lot-fee', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const weekStartDate = req.body.week_start;
+  const lotFee = Number(req.body.lot_fee_amount) || 0;
+  if (!weekStartDate) return res.redirect(`/admin/locations/${id}/pay`);
+  db.query(
+    `
+      INSERT INTO location_weekly_fees (location_id, week_start_date, lot_fee_amount)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (location_id, week_start_date)
+      DO UPDATE SET lot_fee_amount = EXCLUDED.lot_fee_amount
+    `,
+    [id, weekStartDate, lotFee]
+  )
+    .then(() => res.redirect(`/admin/locations/${id}/pay?week_start=${weekStartDate}`))
+    .catch((err) => res.send('Error saving lot fee: ' + err.message));
+});
+
+app.post('/admin/locations/:id/pay', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const weekStartDate = req.body.week_start;
+  if (!weekStartDate) return res.redirect(`/admin/locations/${id}/pay`);
+  try {
+    const weekStart = new Date(`${weekStartDate}T12:00:00`);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    const weekEndDate = formatDate(weekEnd);
+    const valetsRes = await db.query(
+      `
+        SELECT DISTINCT sr.user_id
+        FROM shift_reports sr
+        WHERE sr.location_id = $1
+          AND DATE(sr.shift_date) >= $2
+          AND DATE(sr.shift_date) < $3
+      `,
+      [id, weekStartDate, weekEndDate]
+    );
+    await db.query('DELETE FROM location_pay_allocations WHERE location_id = $1 AND week_start_date = $2', [id, weekStartDate]);
+    for (const row of valetsRes.rows) {
+      const userId = Number(row.user_id);
+      const amount = Number(req.body[`alloc_${userId}`]) || 0;
+      if (amount <= 0) continue;
+      await db.query(
+        `
+          INSERT INTO location_pay_allocations (location_id, week_start_date, user_id, allocated_amount, updated_at)
+          VALUES ($1, $2, $3, $4, NOW())
+        `,
+        [id, weekStartDate, userId, amount]
+      );
+    }
+    return res.redirect(`/admin/locations/${id}/pay?week_start=${weekStartDate}`);
+  } catch (err) {
+    return res.send('Error saving pay allocations: ' + err.message);
+  }
+});
+
+app.post('/admin/locations/:id/pay/autosplit', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const weekStartDate = req.body.week_start;
+  if (!weekStartDate) return res.redirect(`/admin/locations/${id}/pay`);
+  try {
+    const weekStart = new Date(`${weekStartDate}T12:00:00`);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    const weekEndDate = formatDate(weekEnd);
+
+    const [locationRes, valetsRes, weeklyFeeRes] = await Promise.all([
+      db.query('SELECT lot_fee FROM locations WHERE id = $1', [id]),
+      db.query(
+        `
+          SELECT sr.user_id,
+                 COALESCE(SUM(sr.cash_tips), 0) AS total_cash,
+                 COALESCE(SUM(sr.online_tips), 0) AS total_online
+          FROM shift_reports sr
+          WHERE sr.location_id = $1
+            AND DATE(sr.shift_date) >= $2
+            AND DATE(sr.shift_date) < $3
+          GROUP BY sr.user_id
+          ORDER BY sr.user_id
+        `,
+        [id, weekStartDate, weekEndDate]
+      ),
+      db.query('SELECT lot_fee_amount FROM location_weekly_fees WHERE location_id = $1 AND week_start_date = $2', [id, weekStartDate])
+    ]);
+
+    if (!locationRes.rowCount) return res.send('Location not found.');
+    const lotFee = weeklyFeeRes.rowCount ? Number(weeklyFeeRes.rows[0].lot_fee_amount) : Number(locationRes.rows[0].lot_fee || 0);
+    const grossTotal = valetsRes.rows.reduce(
+      (sum, row) => sum + (Number(row.total_cash) || 0) + (Number(row.total_online) || 0),
+      0
+    );
+    const distributable = Math.max(0, grossTotal - lotFee);
+
+    const valetIds = valetsRes.rows.map((row) => Number(row.user_id));
+    await db.query('DELETE FROM location_pay_allocations WHERE location_id = $1 AND week_start_date = $2', [id, weekStartDate]);
+    if (valetIds.length > 0 && distributable > 0) {
+      let running = 0;
+      const perValet = Number((distributable / valetIds.length).toFixed(2));
+      for (let i = 0; i < valetIds.length; i++) {
+        const amount = i === valetIds.length - 1 ? Number((distributable - running).toFixed(2)) : perValet;
+        running += amount;
+        await db.query(
+          `
+            INSERT INTO location_pay_allocations (location_id, week_start_date, user_id, allocated_amount, updated_at)
+            VALUES ($1, $2, $3, $4, NOW())
+          `,
+          [id, weekStartDate, valetIds[i], amount]
+        );
+      }
+    }
+    return res.redirect(`/admin/locations/${id}/pay?week_start=${weekStartDate}`);
+  } catch (err) {
+    return res.send('Error auto-splitting pay: ' + err.message);
+  }
 });
 
 /* ------------------------------
@@ -861,7 +1159,7 @@ app.get('/admin/valet-submission', requireAdmin, (req, res) => {
 });
 
 app.post('/admin/valet-submission', requireAdmin, upload.array('screenshots', 10), (req, res) => {
-  const { shift_date, hours, online_tips, cash_tips, location_id, cars, valet_id } = req.body;
+  const { shift_date, hours, online_tips, cash_tips, location_id, cars, valet_id, shift_notes } = req.body;
   if (!shift_date || online_tips === undefined || cash_tips === undefined || !location_id || !valet_id) {
     return Promise.all([
       db.query('SELECT * FROM locations ORDER BY name ASC'),
@@ -878,10 +1176,19 @@ app.post('/admin/valet-submission', requireAdmin, upload.array('screenshots', 10
   const hoursValue = hours ? Number(hours) : 0;
   const carsValue = cars ? Number(cars) : 0;
   const insertQuery = `
-    INSERT INTO shift_reports (user_id, shift_date, hours, online_tips, cash_tips, location_id, cars)
-    VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id
+    INSERT INTO shift_reports (user_id, shift_date, hours, online_tips, cash_tips, location_id, cars, shift_notes)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id
   `;
-  db.query(insertQuery, [valet_id, shift_date, hoursValue, online_tips, cash_tips, location_id, carsValue])
+  db.query(insertQuery, [
+    valet_id,
+    shift_date,
+    hoursValue,
+    online_tips,
+    cash_tips,
+    location_id,
+    carsValue,
+    shift_notes ? String(shift_notes).trim() : null
+  ])
     .then((result) => {
       const shiftReportId = result.rows[0].id;
       if (req.files && req.files.length > 0) {
@@ -1170,6 +1477,11 @@ app.get('/admin/screenshots', requireAdmin, (req, res) => {
 --------------------------------*/
 function getValetWeekStart(dateTime) {
   const d = new Date(dateTime);
+  // Shift reports are entered as dates; normalize midnight-only values so Monday dates
+  // are treated as the current week instead of rolling to the previous week window.
+  if (d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0 && d.getMilliseconds() === 0) {
+    d.setHours(12, 0, 0, 0);
+  }
   const day = d.getDay();
   const hour = d.getHours();
   if (day === 1 && hour < 6) d.setDate(d.getDate() - 1);
