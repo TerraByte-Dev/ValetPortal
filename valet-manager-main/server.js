@@ -12,6 +12,7 @@ const csvWriter = require('csv-writer').createObjectCsvWriter;
 
 // Your Postgres wrapper (pool + query helper)
 const db = require('./db');
+const { getDatabaseConnectionConfig } = require('./config/database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -31,16 +32,12 @@ app.use('/uploads', express.static(uploadDir));
 /* ------------------------------
    Sessions (Production-ready)
 --------------------------------*/
-// If behind a proxy (Railway/Heroku/etc.), trust it so secure cookies work
+// If behind a proxy, trust it so secure cookies work
 app.set('trust proxy', 1);
 
 // Configure session store in Postgres (no MemoryStore in prod)
 const sessionStore = new pgSession({
-  // Use connection string directly to avoid requiring db.pool export shapes
-  conObject: {
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined
-  },
+  conObject: getDatabaseConnectionConfig(),
   tableName: 'session',
   createTableIfMissing: true
 });

@@ -1,12 +1,8 @@
 // db.js
 const { Pool } = require('pg');
+const { getDatabaseConnectionConfig } = require('./config/database');
 
-const connectionString = process.env.DATABASE_URL; // Railway injects this
-const pool = new Pool({
-  connectionString,
-  // If Railway requires SSL:
-  ssl: process.env.PGSSLMODE === 'require' ? { rejectUnauthorized: false } : undefined
-});
+const pool = new Pool(getDatabaseConnectionConfig());
 
 // Simple helper to run queries (optional)
 const query = (text, params) => pool.query(text, params);
@@ -174,7 +170,7 @@ async function waitForDbAndCreateTables(maxRetries = 15, baseDelayMs = 700) {
 // Kick off on import
 waitForDbAndCreateTables().catch((e) => {
   console.error('Fatal DB init error:', e);
-  process.exit(1); // Crash container so Railway restarts it
+  process.exit(1); // Crash container so the process manager can restart it
 });
 
 module.exports = {
