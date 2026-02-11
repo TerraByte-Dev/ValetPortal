@@ -53,6 +53,7 @@ async function waitForDbAndCreateTables(maxRetries = 15, baseDelayMs = 700) {
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       body TEXT NOT NULL,
+      parent_message_id INTEGER REFERENCES community_messages(id) ON DELETE CASCADE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
@@ -94,6 +95,16 @@ async function waitForDbAndCreateTables(maxRetries = 15, baseDelayMs = 700) {
     );
   `;
 
+  const createLocationRosters = `
+    CREATE TABLE IF NOT EXISTS location_rosters (
+      id SERIAL PRIMARY KEY,
+      location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (location_id, user_id)
+    );
+  `;
+
   const createShiftScreenshots = `
     CREATE TABLE IF NOT EXISTS shift_screenshots (
       id SERIAL PRIMARY KEY,
@@ -117,6 +128,7 @@ async function waitForDbAndCreateTables(maxRetries = 15, baseDelayMs = 700) {
       await pool.query(createShiftScreenshots);
       await pool.query(createLocationWeeklyFees);
       await pool.query(createLocationPayAllocations);
+      await pool.query(createLocationRosters);
 
       // Backfill new columns if upgrading from older schema
       await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS group_id INTEGER`);
@@ -130,6 +142,15 @@ async function waitForDbAndCreateTables(maxRetries = 15, baseDelayMs = 700) {
       await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS links TEXT`);
       await pool.query(`ALTER TABLE locations ADD COLUMN IF NOT EXISTS lot_fee REAL NOT NULL DEFAULT 0`);
       await pool.query(`ALTER TABLE shift_reports ADD COLUMN IF NOT EXISTS shift_notes TEXT`);
+      await pool.query(`ALTER TABLE community_messages ADD COLUMN IF NOT EXISTS parent_message_id INTEGER`);
+      await pool.query(`ALTER TABLE community_messages DROP CONSTRAINT IF EXISTS community_messages_parent_message_id_fkey`);
+      await pool.query(
+        `ALTER TABLE community_messages
+         ADD CONSTRAINT community_messages_parent_message_id_fkey
+         FOREIGN KEY (parent_message_id)
+         REFERENCES community_messages(id)
+         ON DELETE CASCADE`
+      );
 
       await pool.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS visible_in_sidebar BOOLEAN DEFAULT TRUE`);
       await pool.query(`UPDATE groups SET visible_in_sidebar = TRUE WHERE visible_in_sidebar IS NULL`);

@@ -1,28 +1,142 @@
 <%- include('partials/header', { title: 'Analytics' }) %>
+<%
+  const money = (n) => `$${(Number(n) || 0).toFixed(2)}`;
+  const fixed = (n, d = 1) => (Number(n) || 0).toFixed(d);
+  const pct = (n) => (n === null ? 'New' : `${n >= 0 ? '+' : ''}${Number(n).toFixed(1)}%`);
+%>
 <section class="page-header">
   <div>
     <p class="eyebrow">Analytics</p>
-    <h2>Performance analytics</h2>
-    <p class="muted">Dive into weekly performance and compare valets or locations.</p>
+    <h2>Operations metrics</h2>
+    <p class="muted">Week: <%= formatEstDate(weekStart) %> - <%= formatEstDate(weekDisplayEnd) %> (EST)</p>
   </div>
   <div class="button-row">
+    <a class="btn btn-ghost week-arrow" href="/admin/analytics?view=<%= view %>&week_start=<%= previousWeekStartDate %>" aria-label="Previous week">&lt;</a>
+    <a class="btn btn-ghost week-arrow" href="/admin/analytics?view=<%= view %>&week_start=<%= nextWeekStartDate %>" aria-label="Next week">&gt;</a>
+    <a href="/admin/analytics?view=overall&week_start=<%= weekStartDate %>" class="btn <%= view === 'overall' ? 'btn-primary' : 'btn-ghost' %>">Overall</a>
+    <a href="/admin/analytics?view=locations&week_start=<%= weekStartDate %>" class="btn <%= view === 'locations' ? 'btn-primary' : 'btn-ghost' %>">Per Location</a>
     <a href="/admin/charts" class="btn btn-primary">View charts</a>
-    <a href="/admin/charts-compare" class="btn btn-ghost">Compare valets</a>
+    <a href="/admin/charts-compare?week_start=<%= weekStartDate %>" class="btn btn-ghost">Compare valets</a>
   </div>
 </section>
 
-<section class="stat-strip">
+<section class="stat-strip analytics-grid">
   <div class="stat-card">
-    <p class="stat-label">Total shift reports</p>
-    <strong><%= reportCount %></strong>
+    <p class="stat-label">All-time shift reports</p>
+    <strong><%= overall.reportCount %></strong>
   </div>
   <div class="stat-card">
-    <p class="stat-label">Weekly exports</p>
-    <a href="/admin/export-weekly" class="btn btn-ghost">Download CSV</a>
+    <p class="stat-label">All-time money through system</p>
+    <strong><%= money(overall.totalMoney) %></strong>
   </div>
   <div class="stat-card">
-    <p class="stat-label">All reports</p>
-    <a href="/admin/reports" class="btn btn-ghost">Open reports</a>
+    <p class="stat-label">All-time payouts allocated</p>
+    <strong><%= money(overall.totalPayouts) %></strong>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">All-time man hours</p>
+    <strong><%= fixed(overall.totalHours) %>h</strong>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">All-time cars</p>
+    <strong><%= overall.totalCars %></strong>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Avg money per report</p>
+    <strong><%= money(overall.avgMoneyPerReport) %></strong>
   </div>
 </section>
+
+<section class="card">
+  <h3>Week-over-week performance</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>Current week</th>
+          <th>Previous week</th>
+          <th>Change</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Shift reports</td>
+          <td><%= weekly.current.reportCount %></td>
+          <td><%= weekly.previous.reportCount %></td>
+          <td class="<%= changes.reportCountPct !== null && changes.reportCountPct < 0 ? 'metric-down' : 'metric-up' %>"><%= pct(changes.reportCountPct) %></td>
+        </tr>
+        <tr>
+          <td>Total money</td>
+          <td><%= money(weekly.current.totalMoney) %></td>
+          <td><%= money(weekly.previous.totalMoney) %></td>
+          <td class="<%= changes.totalMoneyPct !== null && changes.totalMoneyPct < 0 ? 'metric-down' : 'metric-up' %>"><%= pct(changes.totalMoneyPct) %></td>
+        </tr>
+        <tr>
+          <td>Allocated payouts</td>
+          <td><%= money(weekly.current.totalPayouts) %></td>
+          <td><%= money(weekly.previous.totalPayouts) %></td>
+          <td class="<%= changes.totalPayoutsPct !== null && changes.totalPayoutsPct < 0 ? 'metric-down' : 'metric-up' %>"><%= pct(changes.totalPayoutsPct) %></td>
+        </tr>
+        <tr>
+          <td>Man hours</td>
+          <td><%= fixed(weekly.current.totalHours) %>h</td>
+          <td><%= fixed(weekly.previous.totalHours) %>h</td>
+          <td class="<%= changes.totalHoursPct !== null && changes.totalHoursPct < 0 ? 'metric-down' : 'metric-up' %>"><%= pct(changes.totalHoursPct) %></td>
+        </tr>
+        <tr>
+          <td>Cars parked</td>
+          <td><%= weekly.current.totalCars %></td>
+          <td><%= weekly.previous.totalCars %></td>
+          <td class="<%= changes.totalCarsPct !== null && changes.totalCarsPct < 0 ? 'metric-down' : 'metric-up' %>"><%= pct(changes.totalCarsPct) %></td>
+        </tr>
+        <tr>
+          <td>Money per man hour</td>
+          <td><%= money(weekly.current.moneyPerHour) %></td>
+          <td><%= money(weekly.previous.moneyPerHour) %></td>
+          <td class="<%= changes.moneyPerHourPct !== null && changes.moneyPerHourPct < 0 ? 'metric-down' : 'metric-up' %>"><%= pct(changes.moneyPerHourPct) %></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<% if (view === 'locations') { %>
+<section class="card">
+  <h3>Per-location weekly growth</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Location</th>
+          <th>Money (this week)</th>
+          <th>Money growth</th>
+          <th>Hours (this week)</th>
+          <th>Hours growth</th>
+          <th>Reports growth</th>
+          <th>Cars growth</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!perLocation.length) { %>
+          <tr>
+            <td colspan="7" class="muted">No location data for selected week.</td>
+          </tr>
+        <% } %>
+        <% perLocation.forEach(loc => { %>
+          <tr>
+            <td><%= loc.locationName %></td>
+            <td><%= money(loc.current.totalMoney) %></td>
+            <td class="<%= loc.growth.moneyPct !== null && loc.growth.moneyPct < 0 ? 'metric-down' : 'metric-up' %>"><%= pct(loc.growth.moneyPct) %></td>
+            <td><%= fixed(loc.current.totalHours) %>h</td>
+            <td class="<%= loc.growth.hoursPct !== null && loc.growth.hoursPct < 0 ? 'metric-down' : 'metric-up' %>"><%= pct(loc.growth.hoursPct) %></td>
+            <td class="<%= loc.growth.reportsPct !== null && loc.growth.reportsPct < 0 ? 'metric-down' : 'metric-up' %>"><%= pct(loc.growth.reportsPct) %></td>
+            <td class="<%= loc.growth.carsPct !== null && loc.growth.carsPct < 0 ? 'metric-down' : 'metric-up' %>"><%= pct(loc.growth.carsPct) %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+<% } %>
 <%- include('partials/footer') %>

@@ -60,6 +60,9 @@
     <% messages.forEach(msg => { %>
       <div class="admin-message">
         <div class="muted"><strong><%= msg.name %></strong> · <%= formatDate(msg.created_at) %></div>
+        <% if (msg.parent_message_id) { %>
+          <div class="muted">Reply to: "<%= msg.parent_body || 'Original message removed' %>"</div>
+        <% } %>
         <div class="admin-message-actions">
           <form action="/admin/community/edit/<%= msg.id %>" method="POST" class="admin-message-form">
             <textarea name="body" rows="2"><%= msg.body %></textarea>

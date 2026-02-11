@@ -1,0 +1,43 @@
+<%- include('partials/header', { title: 'Shift Notes' }) %>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Operations notes</p>
+    <h2>Weekly shift notes</h2>
+    <p class="muted">Week: <%= formatEstDate(weekStart) %> - <%= formatEstDate(weekDisplayEnd) %> (EST)</p>
+  </div>
+  <div class="button-row">
+    <a class="btn btn-ghost week-arrow" href="/admin/shift-notes?week_start=<%= previousWeekStartDate %>" aria-label="Previous week">&lt;</a>
+    <a class="btn btn-ghost week-arrow" href="/admin/shift-notes?week_start=<%= nextWeekStartDate %>" aria-label="Next week">&gt;</a>
+    <a class="btn btn-ghost" href="/admin?week_start=<%= weekStartDate %>">Back to Overview</a>
+  </div>
+</section>
+
+<section class="card">
+  <% if (!notesByLocation.length) { %>
+    <div class="empty-state">
+      <h3>No shift notes this week</h3>
+      <p class="muted">When valets leave notes on reports, they appear here grouped by location.</p>
+    </div>
+  <% } %>
+
+  <% notesByLocation.forEach(group => { %>
+    <section class="notes-location-block">
+      <h3><%= group.locationName %></h3>
+      <div class="notes-list">
+        <% group.notes.forEach(item => { %>
+          <article class="note-item">
+            <div class="note-item-head">
+              <strong><%= item.valetName %></strong>
+              <span class="muted"><%= formatEstDate(item.shiftDate) %></span>
+            </div>
+            <p><%= item.note %></p>
+            <div class="row-actions">
+              <a href="/admin/reports/<%= item.id %>" class="btn btn-ghost">Open report</a>
+            </div>
+          </article>
+        <% }) %>
+      </div>
+    </section>
+  <% }) %>
+</section>
+<%- include('partials/footer') %>

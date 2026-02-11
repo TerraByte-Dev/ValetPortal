@@ -63,6 +63,43 @@
           <% if (msg.updated_at && String(msg.updated_at) !== String(msg.created_at)) { %>
             <span class="muted">Edited</span>
           <% } %>
+
+          <form action="/community" method="POST" class="reply-form">
+            <input type="hidden" name="parent_message_id" value="<%= msg.id %>">
+            <div class="form-group">
+              <label for="reply_<%= msg.id %>">Reply</label>
+              <textarea id="reply_<%= msg.id %>" name="body" rows="2" placeholder="Reply to this post..." required></textarea>
+            </div>
+            <div class="btn-row">
+              <button type="submit" class="btn btn-ghost">Reply</button>
+            </div>
+          </form>
+
+          <% if (msg.replies && msg.replies.length) { %>
+            <div class="post-replies">
+              <% msg.replies.forEach(reply => { %>
+                <article class="reply-card">
+                  <div class="post-header">
+                    <div class="post-avatar">
+                      <% if (reply.profile_photo_url) { %>
+                        <img src="/uploads/<%= reply.profile_photo_url %>" alt="Profile photo">
+                      <% } else { %>
+                        <span><%= reply.name.split(' ').map(w => w[0]).join('') %></span>
+                      <% } %>
+                    </div>
+                    <div>
+                      <strong><%= reply.name %></strong>
+                      <% if (reply.group_name) { %>
+                        <span class="muted"> · <%= reply.group_name %></span>
+                      <% } %>
+                      <div class="muted"><%= formatDate(reply.created_at) %></div>
+                    </div>
+                  </div>
+                  <p><%= reply.body %></p>
+                </article>
+              <% }) %>
+            </div>
+          <% } %>
         </article>
       <% }) %>
     </section>

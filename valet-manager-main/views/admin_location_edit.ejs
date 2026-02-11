@@ -1,0 +1,96 @@
+<%- include('partials/header', { title: 'Edit Location' }) %>
+<%
+  const formatMoney = (n) => `$${(Number(n) || 0).toFixed(2)}`;
+%>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Location settings</p>
+    <h2><%= location.name %></h2>
+  </div>
+  <div class="button-row">
+    <a href="/admin/locations" class="btn btn-ghost">Back to Locations</a>
+  </div>
+</section>
+
+<section class="card">
+  <% if (error) { %>
+    <p class="alert alert-error"><%= error %></p>
+  <% } %>
+  <% if (message) { %>
+    <p class="alert alert-success"><%= message %></p>
+  <% } %>
+
+  <h3>Edit properties</h3>
+  <form action="/admin/locations/<%= location.id %>/edit" method="POST" class="form-row">
+    <div class="form-group">
+      <label for="locationName">Location name</label>
+      <input type="text" id="locationName" name="locationName" value="<%= location.name %>" required>
+    </div>
+    <div class="form-group">
+      <label for="lot_fee">Default lot fee</label>
+      <input type="number" step="0.01" id="lot_fee" name="lot_fee" value="<%= Number(location.lot_fee || 0).toFixed(2) %>">
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn btn-primary">Save</button>
+      <a href="/admin/locations/<%= location.id %>/pay" class="btn btn-ghost">Open weekly pay</a>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <h3>Roster (trained valets)</h3>
+  <p class="muted">Track which valets are trained on this location's protocols.</p>
+
+  <form action="/admin/locations/<%= location.id %>/roster/add" method="POST" class="form-row">
+    <div class="form-group">
+      <label for="user_id">Add valet</label>
+      <select id="user_id" name="user_id" required>
+        <option value="">Select valet</option>
+        <% availableValets.forEach(v => { %>
+          <option value="<%= v.id %>"><%= v.name %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn btn-primary">Add to roster</button>
+    </div>
+  </form>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!rosterMembers.length) { %>
+          <tr>
+            <td colspan="2" class="muted">No trained valets assigned yet.</td>
+          </tr>
+        <% } %>
+        <% rosterMembers.forEach(member => { %>
+          <tr>
+            <td><%= member.name %></td>
+            <td>
+              <form action="/admin/locations/<%= location.id %>/roster/remove/<%= member.id %>" method="POST" class="inline-form">
+                <button type="submit" class="btn btn-ghost">Remove</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card danger">
+  <h3>Delete location</h3>
+  <p class="muted">This removes the location and associated settings. Existing shift reports will remain with null location links if constrained behavior allows.</p>
+  <form action="/admin/locations/manage/delete/<%= location.id %>" method="POST" class="inline-form">
+    <input type="text" name="confirm_text" placeholder="Type DELETE" required>
+    <button type="submit" class="btn btn-danger">Delete location</button>
+  </form>
+</section>
+<%- include('partials/footer') %>

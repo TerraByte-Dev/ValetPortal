@@ -1,65 +1,76 @@
 <%- include('partials/header', { title: 'Leaderboard' }) %>
-<div>
-  <h2>Leaderboard</h2>
-  
-  <!-- Dropdown filter for location -->
-  <form action="/admin/leaderboard" method="GET" style="margin-bottom:1em;">
-    <label for="location_id">Filter by Location:</label>
-    <select name="location_id" id="location_id">
-      <option value="">All Locations</option>
-      <% locations.forEach(loc => { %>
-        <option value="<%= loc.id %>" <%= (selectedLocation == loc.id) ? 'selected' : '' %>><%= loc.name %></option>
-      <% }) %>
-    </select>
-    <!-- Preserve current sort/order parameters if desired -->
+<%
+  const money = (n) => `$${(Number(n) || 0).toFixed(2)}`;
+  const preserveLocation = selectedLocation ? `&location_id=${encodeURIComponent(selectedLocation)}` : '&location_id=';
+  const sortLink = (column) => `/admin/leaderboard?week_start=${encodeURIComponent(weekStartDate)}&sort=${column}&order=${(sort === column && order === 'desc') ? 'asc' : 'desc'}${preserveLocation}`;
+%>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Leaderboard</p>
+    <h2>Weekly valet rankings</h2>
+    <p class="muted">Week: <%= formatEstDate(weekStart) %> - <%= formatEstDate(weekDisplayEnd) %> (EST)</p>
+  </div>
+  <div class="button-row">
+    <a class="btn btn-ghost week-arrow" href="/admin/leaderboard?week_start=<%= previousWeekStartDate %>&sort=<%= encodeURIComponent(sort) %>&order=<%= encodeURIComponent(order) %>&location_id=<%= encodeURIComponent(selectedLocation || '') %>" aria-label="Previous week">&lt;</a>
+    <a class="btn btn-ghost week-arrow" href="/admin/leaderboard?week_start=<%= nextWeekStartDate %>&sort=<%= encodeURIComponent(sort) %>&order=<%= encodeURIComponent(order) %>&location_id=<%= encodeURIComponent(selectedLocation || '') %>" aria-label="Next week">&gt;</a>
+    <a href="/admin/charts?week_start=<%= weekStartDate %>" class="btn btn-ghost">View Charts</a>
+    <a href="/admin" class="btn btn-ghost">Back to Overview</a>
+  </div>
+</section>
+
+<section class="card">
+  <form action="/admin/leaderboard" method="GET" class="filter-row">
+    <input type="hidden" name="week_start" value="<%= weekStartDate %>">
     <input type="hidden" name="sort" value="<%= sort %>">
     <input type="hidden" name="order" value="<%= order %>">
-    <button type="submit">Filter</button>
+    <div class="form-group">
+      <label for="location_id">Filter by location</label>
+      <select name="location_id" id="location_id">
+        <option value="">All Locations</option>
+        <% locations.forEach(loc => { %>
+          <option value="<%= loc.id %>" <%= (selectedLocation == loc.id) ? 'selected' : '' %>><%= loc.name %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="filter-actions">
+      <button type="submit" class="btn btn-primary">Apply</button>
+    </div>
   </form>
-  
-  <table border="1" cellspacing="0" cellpadding="5">
-    <thead>
-      <tr>
-        <th>Valet Name</th>
-        <th>Phone</th>
-        <th>
-          <a href="/admin/leaderboard?sort=total_hours&order=<%= (sort === 'total_hours' && order === 'desc') ? 'asc' : 'desc' %><%= selectedLocation ? '&location_id=' + selectedLocation : '' %>">
-            Total Hours
-          </a>
-        </th>
-        <th>
-          <a href="/admin/leaderboard?sort=total_online&order=<%= (sort === 'total_online' && order === 'desc') ? 'asc' : 'desc' %><%= selectedLocation ? '&location_id=' + selectedLocation : '' %>">
-            Online Payments
-          </a>
-        </th>
-        <th>
-          <a href="/admin/leaderboard?sort=total_cash&order=<%= (sort === 'total_cash' && order === 'desc') ? 'asc' : 'desc' %><%= selectedLocation ? '&location_id=' + selectedLocation : '' %>">
-            Cash Payments
-          </a>
-        </th>
-        <th>
-          <a href="/admin/leaderboard?sort=total_tips&order=<%= (sort === 'total_tips' && order === 'desc') ? 'asc' : 'desc' %><%= selectedLocation ? '&location_id=' + selectedLocation : '' %>">
-            Total Tips
-          </a>
-        </th>
-      </tr>
-    </thead>
-    <tbody>
-      <% leaderboard.forEach(entry => { %>
-        <tr>
-          <td><%= entry.name %></td>
-          <td><%= entry.phone %></td>
-          <td><%= entry.total_hours %></td>
-          <td><%= entry.total_online %></td>
-          <td><%= entry.total_cash %></td>
-          <td><%= entry.total_tips %></td>
-        </tr>
-      <% }) %>
-    </tbody>
-  </table>
-  <br>
-  <a href="/admin" class="btn-dark">Back to Admin Portal</a>
-  <a href="/admin/charts" class="btn-dark">View Charts</a>
+</section>
 
-</div>
+<section class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Valet Name</th>
+          <th>Phone</th>
+          <th><a href="<%= sortLink('total_hours') %>">Total Hours</a></th>
+          <th><a href="<%= sortLink('total_online') %>">Online Payments</a></th>
+          <th><a href="<%= sortLink('total_cash') %>">Cash Payments</a></th>
+          <th><a href="<%= sortLink('total_tips') %>">Total Tips</a></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!leaderboard.length) { %>
+          <tr>
+            <td colspan="7" class="muted">No weekly leaderboard data.</td>
+          </tr>
+        <% } %>
+        <% leaderboard.forEach((entry, idx) => { %>
+          <tr class="<%= idx === 0 ? 'leader-gold' : idx === 1 ? 'leader-silver' : idx === 2 ? 'leader-bronze' : '' %>">
+            <td><strong><%= idx + 1 %></strong></td>
+            <td><%= entry.name %></td>
+            <td><%= entry.phone %></td>
+            <td><%= Number(entry.total_hours || 0).toFixed(1) %></td>
+            <td><%= money(entry.total_online) %></td>
+            <td><%= money(entry.total_cash) %></td>
+            <td><%= money(entry.total_tips) %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
 <%- include('partials/footer') %>

@@ -1,15 +1,18 @@
 <%- include('partials/header', { title: 'Admin Overview' }) %>
+<%
+  const formatMoney = (n) => `$${(Number(n) || 0).toFixed(2)}`;
+%>
 <section class="page-header">
   <div>
     <p class="eyebrow">Admin command center</p>
     <h2>Weekly overview</h2>
-    <p class="muted">Week: <%= formatEstDate(weekStart) %> - <%= formatEstDate(weekDisplayEnd) %></p>
+    <p class="muted">Week: <%= formatEstDate(weekStart) %> - <%= formatEstDate(weekDisplayEnd) %> (EST)</p>
   </div>
   <div class="button-row">
     <a class="btn btn-ghost week-arrow" href="/admin?week_start=<%= previousWeekStartDate %>" aria-label="Previous week">&lt;</a>
     <a class="btn btn-ghost week-arrow" href="/admin?week_start=<%= nextWeekStartDate %>" aria-label="Next week">&gt;</a>
     <a class="btn btn-primary" href="/admin/analytics">Go to Analytics</a>
-    <a class="btn btn-ghost" href="/admin/reports">Shift Report Page</a>
+    <a class="btn btn-ghost" href="/admin/reports">Shift Reports</a>
   </div>
 </section>
 
@@ -34,22 +37,65 @@
   </div>
 </section>
 
+<section class="card warning-card">
+  <div class="warning-row">
+    <span class="warning-mark">!</span>
+    <div>
+      <h3>Shift notes this week: <%= noteCount %></h3>
+      <p class="muted">Review notes by location to catch handoff issues, exceptions, and special instructions.</p>
+    </div>
+    <a href="/admin/shift-notes?week_start=<%= weekStartDate %>" class="btn btn-ghost">Open Shift Notes</a>
+  </div>
+</section>
+
 <section class="card">
   <div class="card-header">
-    <h3>Recent shift reports</h3>
-    <a href="/admin/reports" class="btn btn-ghost">View all</a>
+    <h3>Weekly location overviews</h3>
+    <a href="/admin/reports?sort=location" class="btn btn-ghost">Open Shift Reports</a>
   </div>
-  <div class="report-list">
-    <% if (recentReports.length === 0) { %>
-      <p class="muted">No reports submitted yet.</p>
+  <div class="location-grid">
+    <% if (!locations.length) { %>
+      <div class="card empty-state">
+        <h3>No locations yet</h3>
+        <p class="muted">Add one from Locations to start tracking.</p>
+      </div>
     <% } %>
-    <% recentReports.forEach(report => { %>
-      <a class="report-row" href="/admin/reports/<%= report.id %>">
-        <span><%= formatEstDate(report.shift_date) %></span>
-        <span><%= report.location_name || 'Unassigned' %></span>
-        <span><%= report.valet_name %> <% if (report.shift_notes) { %><span class="note-flag" title="Has shift notes">!</span><% } %></span>
-        <span>$<%= Number(report.cash_tips || 0).toFixed(2) %></span>
-        <span>$<%= Number(report.online_tips || 0).toFixed(2) %></span>
+    <% locations.forEach(loc => { %>
+      <a class="location-card" href="/admin/locations/<%= loc.id %>/pay?week_start=<%= weekStartDate %>">
+        <div class="location-card-head">
+          <h3><%= loc.name %></h3>
+          <span class="pill">Lot fee: <%= formatMoney(loc.lot_fee) %></span>
+        </div>
+        <div class="location-metrics">
+          <div>
+            <span class="muted">Cash</span>
+            <strong><%= formatMoney(loc.total_cash) %></strong>
+          </div>
+          <div>
+            <span class="muted">Digital</span>
+            <strong><%= formatMoney(loc.total_online) %></strong>
+          </div>
+          <div>
+            <span class="muted">Hours</span>
+            <strong><%= Number(loc.total_hours || 0).toFixed(1) %></strong>
+          </div>
+          <div>
+            <span class="muted">Cars</span>
+            <strong><%= Number(loc.total_cars || 0) %></strong>
+          </div>
+        </div>
+        <div class="location-valets">
+          <h4>Top trained hours this week</h4>
+          <% if (!loc.valets.length) { %>
+            <p class="muted">No shifts submitted this week.</p>
+          <% } %>
+          <% loc.valets.slice(0, 4).forEach(v => { %>
+            <div class="location-valet-row">
+              <span><%= v.name %></span>
+              <span><%= Number(v.hours || 0).toFixed(1) %>h</span>
+            </div>
+          <% }) %>
+        </div>
       </a>
     <% }) %>
   </div>

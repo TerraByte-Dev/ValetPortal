@@ -1,63 +1,49 @@
 <%- include('partials/header', { title: 'Locations' }) %>
-<%
-  const formatMoney = (n) => `$${(Number(n) || 0).toFixed(2)}`;
-%>
 <section class="page-header">
   <div>
     <p class="eyebrow">Locations</p>
-    <h2>Weekly location overview</h2>
-    <p class="muted">Week: <%= formatEstDate(weekStart) %> - <%= formatEstDate(weekDisplayEnd) %> (EST)</p>
-  </div>
-  <div class="button-row">
-    <a href="/admin/locations?week_start=<%= previousWeekStartDate %>" class="btn btn-ghost week-arrow" aria-label="Previous week">&lt;</a>
-    <a href="/admin/locations?week_start=<%= nextWeekStartDate %>" class="btn btn-ghost week-arrow" aria-label="Next week">&gt;</a>
-    <a href="/admin/locations/manage" class="btn btn-ghost">Manage Locations</a>
+    <h2>Manage locations</h2>
+    <p class="muted">Create locations, update lot fee defaults, and maintain trained valet rosters.</p>
   </div>
 </section>
 
-<section class="location-grid">
+<section class="card">
+  <% if (error) { %>
+    <p class="alert alert-error"><%= error %></p>
+  <% } %>
+  <% if (message) { %>
+    <p class="alert alert-success"><%= message %></p>
+  <% } %>
+  <h3>Add location</h3>
+  <form action="/admin/locations/manage" method="POST" class="form-row">
+    <div class="form-group">
+      <label for="locationName">Location name</label>
+      <input type="text" id="locationName" name="locationName" required>
+    </div>
+    <div class="form-group">
+      <label for="lot_fee">Default lot fee</label>
+      <input type="number" step="0.01" id="lot_fee" name="lot_fee" value="0">
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn btn-primary">Add</button>
+    </div>
+  </form>
+</section>
+
+<section class="location-manage-grid">
   <% if (!locations.length) { %>
     <div class="card empty-state">
       <h3>No locations yet</h3>
-      <p class="muted">Add one from Manage Locations to start tracking weekly totals.</p>
+      <p class="muted">Create your first location to start assigning trained roster members.</p>
     </div>
   <% } %>
   <% locations.forEach(loc => { %>
-    <a class="location-card" href="/admin/locations/<%= loc.id %>/pay?week_start=<%= weekStartDate %>">
-      <div class="location-card-head">
+    <a class="location-manage-card" href="/admin/locations/<%= loc.id %>/edit">
+      <div>
         <h3><%= loc.name %></h3>
-        <span class="pill">Lot fee: <%= formatMoney(loc.lot_fee) %></span>
+        <p class="muted">Trained roster: <%= Number(loc.roster_count || 0) %></p>
       </div>
-      <div class="location-metrics">
-        <div>
-          <span class="muted">Cash</span>
-          <strong><%= formatMoney(loc.total_cash) %></strong>
-        </div>
-        <div>
-          <span class="muted">Digital</span>
-          <strong><%= formatMoney(loc.total_online) %></strong>
-        </div>
-        <div>
-          <span class="muted">Hours</span>
-          <strong><%= Number(loc.total_hours || 0).toFixed(1) %></strong>
-        </div>
-        <div>
-          <span class="muted">Cars</span>
-          <strong><%= Number(loc.total_cars || 0) %></strong>
-        </div>
-      </div>
-      <div class="location-valets">
-        <h4>Valets & hours</h4>
-        <% if (!loc.valets.length) { %>
-          <p class="muted">No shifts this week.</p>
-        <% } %>
-        <% loc.valets.forEach(v => { %>
-          <div class="location-valet-row">
-            <span><%= v.name %></span>
-            <span><%= Number(v.hours || 0).toFixed(1) %>h</span>
-          </div>
-        <% }) %>
-      </div>
+      <span class="pill">Edit</span>
     </a>
   <% }) %>
 </section>

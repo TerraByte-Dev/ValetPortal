@@ -124,6 +124,13 @@ function isValidPin(pin) {
   return /^\d{4}$/.test(pin);
 }
 
+function calculatePercentChange(current, previous) {
+  const curr = Number(current) || 0;
+  const prev = Number(previous) || 0;
+  if (prev === 0) return curr === 0 ? 0 : null;
+  return ((curr - prev) / prev) * 100;
+}
+
 function todayEstIsoDate() {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
@@ -432,7 +439,7 @@ app.get('/messages', requireLogin, (req, res) => {
 --------------------------------*/
 app.get('/community', requireLogin, (req, res) => {
   const messagesQuery = `
-    SELECT cm.id, cm.body, cm.created_at, cm.updated_at,
+    SELECT cm.id, cm.body, cm.created_at, cm.updated_at, cm.parent_message_id,
            u.name, u.profile_photo_url, g.name AS group_name
     FROM community_messages cm
     JOIN users u ON cm.user_id = u.id
@@ -447,13 +454,37 @@ app.get('/community', requireLogin, (req, res) => {
     ORDER BY u.name ASC
   `;
   Promise.all([db.query(messagesQuery), db.query(usersQuery)])
-    .then(([messages, users]) =>
+    .then(([messages, users]) => {
+      const byParent = new Map();
+      const topLevel = [];
+      messages.rows.forEach((row) => {
+        const message = {
+          id: row.id,
+          body: row.body,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+          parent_message_id: row.parent_message_id ? Number(row.parent_message_id) : null,
+          name: row.name,
+          profile_photo_url: row.profile_photo_url,
+          group_name: row.group_name,
+          replies: []
+        };
+        if (message.parent_message_id) {
+          if (!byParent.has(message.parent_message_id)) byParent.set(message.parent_message_id, []);
+          byParent.get(message.parent_message_id).push(message);
+        } else {
+          topLevel.push(message);
+        }
+      });
+      topLevel.forEach((msg) => {
+        msg.replies = (byParent.get(msg.id) || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      });
       res.render('community', {
-        messages: messages.rows,
+        messages: topLevel,
         users: users.rows,
         error: null
       })
-    )
+    })
     .catch((err) =>
       res.render('community', { messages: [], users: [], error: 'Error loading community: ' + err.message })
     );
@@ -461,8 +492,24 @@ app.get('/community', requireLogin, (req, res) => {
 
 app.post('/community', requireLogin, (req, res) => {
   const body = String(req.body.body || '').trim();
+  const parentMessageId = Number(req.body.parent_message_id) || null;
   if (!body) return res.redirect('/community');
-  db.query('INSERT INTO community_messages (user_id, body) VALUES ($1, $2)', [req.session.user.id, body])
+  if (parentMessageId) {
+    return db
+      .query('SELECT id FROM community_messages WHERE id = $1', [parentMessageId])
+      .then((check) => {
+        const parentId = check.rowCount ? parentMessageId : null;
+        return db.query('INSERT INTO community_messages (user_id, body, parent_message_id) VALUES ($1, $2, $3)', [
+          req.session.user.id,
+          body,
+          parentId
+        ]);
+      })
+      .then(() => res.redirect('/community'))
+      .catch(() => res.redirect('/community'));
+  }
+  return db
+    .query('INSERT INTO community_messages (user_id, body, parent_message_id) VALUES ($1, $2, $3)', [req.session.user.id, body, null])
     .then(() => res.redirect('/community'))
     .catch(() => res.redirect('/community'));
 });
@@ -472,10 +519,8 @@ app.post('/community', requireLogin, (req, res) => {
 --------------------------------*/
 app.get('/admin', requireAdmin, (req, res) => {
   const { weekStart, weekEnd, weekStartDate, weekEndDate } = getRequestedWeekRange(req.query.week_start);
-  const previousWeekStart = new Date(weekStart);
-  previousWeekStart.setDate(previousWeekStart.getDate() - 7);
-  const nextWeekStart = new Date(weekStart);
-  nextWeekStart.setDate(nextWeekStart.getDate() + 7);
+  const previousWeekStartDate = addDaysToIsoDate(weekStartDate, -7);
+  const nextWeekStartDate = addDaysToIsoDate(weekStartDate, 7);
   const weekDisplayEnd = new Date(weekEnd);
   weekDisplayEnd.setDate(weekDisplayEnd.getDate() - 1);
 
@@ -484,8 +529,8 @@ app.get('/admin', requireAdmin, (req, res) => {
     FROM users u
     LEFT JOIN shift_reports sr
       ON sr.user_id = u.id
-      AND DATE(sr.shift_date AT TIME ZONE 'America/New_York') >= $1
-      AND DATE(sr.shift_date AT TIME ZONE 'America/New_York') < $2
+      AND DATE(sr.shift_date) >= $1
+      AND DATE(sr.shift_date) < $2
     WHERE u.role = 'valet'
     GROUP BY u.id
     ORDER BY total_hours DESC
@@ -498,41 +543,139 @@ app.get('/admin', requireAdmin, (req, res) => {
     FROM users u
     LEFT JOIN shift_reports sr
       ON sr.user_id = u.id
-      AND DATE(sr.shift_date AT TIME ZONE 'America/New_York') >= $1
-      AND DATE(sr.shift_date AT TIME ZONE 'America/New_York') < $2
+      AND DATE(sr.shift_date) >= $1
+      AND DATE(sr.shift_date) < $2
     WHERE u.role = 'valet'
     GROUP BY u.id
     ORDER BY total_tips DESC
     LIMIT 1
   `;
 
-  const recentQuery = `
-    SELECT sr.id, sr.shift_date, sr.online_tips, sr.cash_tips, sr.shift_notes,
-           u.name AS valet_name, l.name AS location_name
+  const locationSummaryQuery = `
+    SELECT sr.location_id, u.name AS valet_name,
+           COALESCE(SUM(sr.hours), 0) AS total_hours,
+           COALESCE(SUM(sr.cars), 0) AS total_cars,
+           COALESCE(SUM(sr.cash_tips), 0) AS total_cash,
+           COALESCE(SUM(sr.online_tips), 0) AS total_online
     FROM shift_reports sr
     JOIN users u ON sr.user_id = u.id
-    LEFT JOIN locations l ON sr.location_id = l.id
-    ORDER BY sr.shift_date DESC
-    LIMIT 6
+    WHERE DATE(sr.shift_date) >= $1
+      AND DATE(sr.shift_date) < $2
+    GROUP BY sr.location_id, u.name
+    ORDER BY u.name ASC
+  `;
+
+  const noteCountQuery = `
+    SELECT COUNT(*)::int AS note_count
+    FROM shift_reports sr
+    WHERE DATE(sr.shift_date) >= $1
+      AND DATE(sr.shift_date) < $2
+      AND COALESCE(BTRIM(sr.shift_notes), '') <> ''
   `;
 
   Promise.all([
     db.query(topHoursQuery, [weekStartDate, weekEndDate]),
     db.query(topTipsQuery, [weekStartDate, weekEndDate]),
-    db.query(recentQuery)
+    db.query('SELECT * FROM locations ORDER BY name ASC'),
+    db.query(locationSummaryQuery, [weekStartDate, weekEndDate]),
+    db.query(noteCountQuery, [weekStartDate, weekEndDate])
   ])
-    .then(([topHours, topTips, recent]) => {
+    .then(([topHours, topTips, locationsRes, locationSummaryRes, notesRes]) => {
+      const locations = locationsRes.rows.map((loc) => ({
+        id: loc.id,
+        name: loc.name,
+        lot_fee: Number(loc.lot_fee) || 0,
+        total_hours: 0,
+        total_cars: 0,
+        total_cash: 0,
+        total_online: 0,
+        valets: []
+      }));
+      const byLocation = new Map(locations.map((loc) => [loc.id, loc]));
+      locationSummaryRes.rows.forEach((row) => {
+        const location = byLocation.get(Number(row.location_id));
+        if (!location) return;
+        const hours = Number(row.total_hours) || 0;
+        const cars = Number(row.total_cars) || 0;
+        const cash = Number(row.total_cash) || 0;
+        const online = Number(row.total_online) || 0;
+        location.total_hours += hours;
+        location.total_cars += cars;
+        location.total_cash += cash;
+        location.total_online += online;
+        location.valets.push({
+          name: row.valet_name,
+          hours
+        });
+      });
+      locations.forEach((loc) => loc.valets.sort((a, b) => b.hours - a.hours));
+      const noteCount = notesRes.rows[0] ? Number(notesRes.rows[0].note_count) || 0 : 0;
       res.render('admin_dashboard', {
         weekStart,
         weekDisplayEnd,
+        weekStartDate,
         topHours: topHours.rows[0] || null,
         topTips: topTips.rows[0] || null,
-        recentReports: recent.rows,
-        previousWeekStartDate: formatDate(previousWeekStart),
-        nextWeekStartDate: formatDate(nextWeekStart)
+        locations,
+        noteCount,
+        previousWeekStartDate,
+        nextWeekStartDate
       });
     })
     .catch((err) => res.send('Error retrieving admin dashboard: ' + err.message));
+});
+
+app.get('/admin/shift-notes', requireAdmin, (req, res) => {
+  const { weekStart, weekEnd, weekStartDate, weekEndDate } = getRequestedWeekRange(req.query.week_start);
+  const weekDisplayEnd = new Date(weekEnd);
+  weekDisplayEnd.setDate(weekDisplayEnd.getDate() - 1);
+  const previousWeekStartDate = addDaysToIsoDate(weekStartDate, -7);
+  const nextWeekStartDate = addDaysToIsoDate(weekStartDate, 7);
+
+  const query = `
+    SELECT sr.id, sr.shift_date, sr.shift_notes, u.name AS valet_name,
+           l.id AS location_id, COALESCE(l.name, 'Unassigned') AS location_name
+    FROM shift_reports sr
+    JOIN users u ON sr.user_id = u.id
+    LEFT JOIN locations l ON sr.location_id = l.id
+    WHERE DATE(sr.shift_date) >= $1
+      AND DATE(sr.shift_date) < $2
+      AND COALESCE(BTRIM(sr.shift_notes), '') <> ''
+    ORDER BY l.name ASC NULLS LAST, sr.shift_date DESC
+  `;
+
+  db.query(query, [weekStartDate, weekEndDate])
+    .then((result) => {
+      const notesByLocation = [];
+      const grouped = new Map();
+      result.rows.forEach((row) => {
+        const key = row.location_id ? String(row.location_id) : 'unassigned';
+        if (!grouped.has(key)) {
+          grouped.set(key, {
+            locationId: row.location_id,
+            locationName: row.location_name,
+            notes: []
+          });
+        }
+        grouped.get(key).notes.push({
+          id: row.id,
+          shiftDate: row.shift_date,
+          valetName: row.valet_name,
+          note: row.shift_notes
+        });
+      });
+      grouped.forEach((value) => notesByLocation.push(value));
+
+      res.render('admin_shift_notes', {
+        weekStart,
+        weekDisplayEnd,
+        weekStartDate,
+        previousWeekStartDate,
+        nextWeekStartDate,
+        notesByLocation
+      });
+    })
+    .catch((err) => res.send('Error loading shift notes: ' + err.message));
 });
 
 app.get('/admin/reports', requireAdmin, (req, res) => {
@@ -688,120 +831,144 @@ app.get('/admin/export', requireAdmin, (req, res) => {
    Admin: Locations
 --------------------------------*/
 app.get('/admin/locations', requireAdmin, (req, res) => {
-  const { weekStartDate, weekEndDate, weekStart, weekEnd } = getRequestedWeekRange(req.query.week_start);
-  const weekDisplayEnd = new Date(weekEnd);
-  weekDisplayEnd.setDate(weekDisplayEnd.getDate() - 1);
-  const previousWeekStartDate = addDaysToIsoDate(weekStartDate, -7);
-  const nextWeekStartDate = addDaysToIsoDate(weekStartDate, 7);
-  const reportsQuery = `
-    SELECT sr.location_id, u.name AS valet_name,
-           COALESCE(SUM(sr.hours), 0) AS total_hours,
-           COALESCE(SUM(sr.cars), 0) AS total_cars,
-           COALESCE(SUM(sr.cash_tips), 0) AS total_cash,
-           COALESCE(SUM(sr.online_tips), 0) AS total_online
-    FROM shift_reports sr
-    JOIN users u ON sr.user_id = u.id
-    WHERE DATE(sr.shift_date) >= $1
-      AND DATE(sr.shift_date) < $2
-    GROUP BY sr.location_id, u.name
-    ORDER BY u.name ASC
-  `;
-
-  Promise.all([
-    db.query('SELECT * FROM locations ORDER BY name ASC'),
-    db.query(reportsQuery, [weekStartDate, weekEndDate])
-  ])
-    .then(([locationsRes, reportsRes]) => {
-      const locations = locationsRes.rows.map((loc) => ({
-        id: loc.id,
-        name: loc.name,
-        lot_fee: Number(loc.lot_fee) || 0,
-        total_hours: 0,
-        total_cars: 0,
-        total_cash: 0,
-        total_online: 0,
-        valets: []
-      }));
-      const byLocation = new Map(locations.map((l) => [l.id, l]));
-      reportsRes.rows.forEach((row) => {
-        const summary = byLocation.get(row.location_id);
-        if (!summary) return;
-        const hours = Number(row.total_hours) || 0;
-        const cars = Number(row.total_cars) || 0;
-        const cash = Number(row.total_cash) || 0;
-        const online = Number(row.total_online) || 0;
-        summary.total_hours += hours;
-        summary.total_cars += cars;
-        summary.total_cash += cash;
-        summary.total_online += online;
-        summary.valets.push({
-          name: row.valet_name,
-          hours
-        });
-      });
-      locations.forEach((loc) => loc.valets.sort((a, b) => b.hours - a.hours));
+  const message = req.query.message || null;
+  const error = req.query.error || null;
+  db.query(
+    `
+      SELECT l.id, l.name, l.lot_fee, COALESCE(COUNT(lr.user_id), 0)::int AS roster_count
+      FROM locations l
+      LEFT JOIN location_rosters lr ON lr.location_id = l.id
+      GROUP BY l.id
+      ORDER BY l.name ASC
+    `
+  )
+    .then((locationsRes) =>
       res.render('admin_locations', {
-        locations,
-        weekStart,
-        weekDisplayEnd,
-        weekStartDate,
-        previousWeekStartDate,
-        nextWeekStartDate
-      });
-    })
-    .catch((err) => res.send('Error retrieving location overview: ' + err.message));
+        locations: locationsRes.rows,
+        message,
+        error
+      })
+    )
+    .catch((err) => res.send('Error retrieving locations: ' + err.message));
 });
 
 app.get('/admin/locations/manage', requireAdmin, (req, res) => {
-  db.query('SELECT * FROM locations ORDER BY name ASC')
-    .then((r) => res.render('admin_locations_manage', { locations: r.rows, error: null, message: null }))
-    .catch((err) => res.send('Error retrieving locations: ' + err.message));
+  res.redirect('/admin/locations');
 });
 
 app.post('/admin/locations/manage', requireAdmin, (req, res) => {
   const { locationName, lot_fee } = req.body;
   if (!locationName) {
-    return db
-      .query('SELECT * FROM locations ORDER BY name ASC')
-      .then((r) => res.render('admin_locations_manage', { locations: r.rows, error: 'Location name is required.', message: null }));
+    return res.redirect('/admin/locations?error=' + encodeURIComponent('Location name is required.'));
   }
   db.query('INSERT INTO locations (name, lot_fee) VALUES ($1, $2)', [locationName, Number(lot_fee) || 0])
-    .then(() => db.query('SELECT * FROM locations ORDER BY name ASC'))
-    .then((r) => res.render('admin_locations_manage', { locations: r.rows, error: null, message: 'Location added.' }))
-    .catch((err) =>
-      res.render('admin_locations_manage', { locations: [], error: 'Error adding location: ' + err.message, message: null })
-    );
+    .then(() => res.redirect('/admin/locations?message=' + encodeURIComponent('Location added.')))
+    .catch((err) => res.redirect('/admin/locations?error=' + encodeURIComponent('Error adding location: ' + err.message)));
 });
 
 app.post('/admin/locations/manage/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
   const { locationName, lot_fee } = req.body;
-  if (!locationName) return res.redirect('/admin/locations/manage');
+  if (!locationName) {
+    return res.redirect(`/admin/locations/${id}/edit?error=${encodeURIComponent('Location name is required.')}`);
+  }
   db.query('UPDATE locations SET name = $1, lot_fee = $2 WHERE id = $3', [locationName, Number(lot_fee) || 0, id])
-    .then(() => res.redirect('/admin/locations/manage'))
-    .catch((err) => res.send('Error updating location: ' + err.message));
+    .then(() => res.redirect(`/admin/locations/${id}/edit?message=${encodeURIComponent('Location updated.')}`))
+    .catch((err) => res.redirect(`/admin/locations/${id}/edit?error=${encodeURIComponent('Error updating location: ' + err.message)}`));
 });
 
 app.post('/admin/locations/manage/delete/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
   const { confirm_text } = req.body;
   if (confirm_text !== 'DELETE') {
-    return db
-      .query('SELECT * FROM locations ORDER BY name ASC')
-      .then((r) =>
-        res.render('admin_locations_manage', {
-          locations: r.rows,
-          error: 'Type DELETE to confirm location removal.',
-          message: null
-        })
-      );
+    return res.redirect(
+      `/admin/locations/${id}/edit?error=${encodeURIComponent('Type DELETE to confirm location removal.')}`
+    );
   }
   db.query('DELETE FROM locations WHERE id = $1', [id])
-    .then(() => db.query('SELECT * FROM locations ORDER BY name ASC'))
-    .then((r) => res.render('admin_locations_manage', { locations: r.rows, error: null, message: 'Location removed.' }))
-    .catch((err) =>
-      res.render('admin_locations_manage', { locations: [], error: 'Error removing location: ' + err.message, message: null })
-    );
+    .then(() => res.redirect('/admin/locations?message=' + encodeURIComponent('Location removed.')))
+    .catch((err) => res.redirect('/admin/locations?error=' + encodeURIComponent('Error removing location: ' + err.message)));
+});
+
+app.get('/admin/locations/:id/edit', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const error = req.query.error || null;
+  const message = req.query.message || null;
+  Promise.all([
+    db.query('SELECT * FROM locations WHERE id = $1', [id]),
+    db.query(
+      `
+        SELECT u.id, u.name
+        FROM location_rosters lr
+        JOIN users u ON u.id = lr.user_id
+        WHERE lr.location_id = $1
+        ORDER BY u.name ASC
+      `,
+      [id]
+    ),
+    db.query(
+      `
+        SELECT u.id, u.name
+        FROM users u
+        WHERE u.role = 'valet'
+          AND NOT EXISTS (
+            SELECT 1
+            FROM location_rosters lr
+            WHERE lr.location_id = $1
+              AND lr.user_id = u.id
+          )
+        ORDER BY u.name ASC
+      `,
+      [id]
+    )
+  ])
+    .then(([locationRes, rosterRes, availableRes]) => {
+      if (!locationRes.rowCount) return res.send('Location not found.');
+      return res.render('admin_location_edit', {
+        location: locationRes.rows[0],
+        rosterMembers: rosterRes.rows,
+        availableValets: availableRes.rows,
+        error,
+        message
+      });
+    })
+    .catch((err) => res.send('Error loading location settings: ' + err.message));
+});
+
+app.post('/admin/locations/:id/edit', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const { locationName, lot_fee } = req.body;
+  if (!locationName) {
+    return res.redirect(`/admin/locations/${id}/edit?error=${encodeURIComponent('Location name is required.')}`);
+  }
+  db.query('UPDATE locations SET name = $1, lot_fee = $2 WHERE id = $3', [locationName, Number(lot_fee) || 0, id])
+    .then(() => res.redirect(`/admin/locations/${id}/edit?message=${encodeURIComponent('Location updated.')}`))
+    .catch((err) => res.redirect(`/admin/locations/${id}/edit?error=${encodeURIComponent('Error updating location: ' + err.message)}`));
+});
+
+app.post('/admin/locations/:id/roster/add', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const userId = Number(req.body.user_id);
+  if (!userId) {
+    return res.redirect(`/admin/locations/${id}/edit?error=${encodeURIComponent('Select a valet to add.')}`);
+  }
+  db.query(
+    `
+      INSERT INTO location_rosters (location_id, user_id)
+      VALUES ($1, $2)
+      ON CONFLICT (location_id, user_id) DO NOTHING
+    `,
+    [id, userId]
+  )
+    .then(() => res.redirect(`/admin/locations/${id}/edit?message=${encodeURIComponent('Roster updated.')}`))
+    .catch((err) => res.redirect(`/admin/locations/${id}/edit?error=${encodeURIComponent('Error updating roster: ' + err.message)}`));
+});
+
+app.post('/admin/locations/:id/roster/remove/:userId', requireAdmin, (req, res) => {
+  const { id, userId } = req.params;
+  db.query('DELETE FROM location_rosters WHERE location_id = $1 AND user_id = $2', [id, userId])
+    .then(() => res.redirect(`/admin/locations/${id}/edit?message=${encodeURIComponent('Roster updated.')}`))
+    .catch((err) => res.redirect(`/admin/locations/${id}/edit?error=${encodeURIComponent('Error updating roster: ' + err.message)}`));
 });
 
 app.get('/admin/locations/:id/pay', requireAdmin, (req, res) => {
@@ -1213,9 +1380,11 @@ app.post('/admin/groups/delete/:id', requireAdmin, (req, res) => {
 --------------------------------*/
 app.get('/admin/community', requireAdmin, (req, res) => {
   const messagesQuery = `
-    SELECT cm.id, cm.body, cm.created_at, cm.updated_at,
+    SELECT cm.id, cm.body, cm.created_at, cm.updated_at, cm.parent_message_id,
+           parent.body AS parent_body,
            u.name, u.profile_photo_url, g.name AS group_name
     FROM community_messages cm
+    LEFT JOIN community_messages parent ON parent.id = cm.parent_message_id
     JOIN users u ON cm.user_id = u.id
     LEFT JOIN groups g ON u.group_id = g.id
     ORDER BY cm.created_at DESC
@@ -1266,8 +1435,175 @@ app.post('/admin/community/groups/:id', requireAdmin, (req, res) => {
    Admin: Analytics Landing
 --------------------------------*/
 app.get('/admin/analytics', requireAdmin, (req, res) => {
-  db.query('SELECT COUNT(*)::int AS count FROM shift_reports')
-    .then((r) => res.render('admin_analytics', { reportCount: r.rows[0].count }))
+  const view = req.query.view === 'locations' ? 'locations' : 'overall';
+  const { weekStart, weekEnd, weekStartDate, weekEndDate } = getRequestedWeekRange(req.query.week_start);
+  const weekDisplayEnd = new Date(weekEnd);
+  weekDisplayEnd.setDate(weekDisplayEnd.getDate() - 1);
+  const previousWeekStartDate = addDaysToIsoDate(weekStartDate, -7);
+  const previousWeekEndDate = weekStartDate;
+  const nextWeekStartDate = addDaysToIsoDate(weekStartDate, 7);
+
+  const allTimeQuery = `
+    SELECT
+      COUNT(*)::int AS report_count,
+      COALESCE(SUM(sr.hours), 0) AS total_hours,
+      COALESCE(SUM(sr.cars), 0) AS total_cars,
+      COALESCE(SUM(sr.cash_tips), 0) AS total_cash,
+      COALESCE(SUM(sr.online_tips), 0) AS total_online
+    FROM shift_reports sr
+  `;
+
+  const weeklyQuery = `
+    SELECT
+      COUNT(*)::int AS report_count,
+      COALESCE(SUM(sr.hours), 0) AS total_hours,
+      COALESCE(SUM(sr.cars), 0) AS total_cars,
+      COALESCE(SUM(sr.cash_tips), 0) AS total_cash,
+      COALESCE(SUM(sr.online_tips), 0) AS total_online
+    FROM shift_reports sr
+    WHERE DATE(sr.shift_date) >= $1
+      AND DATE(sr.shift_date) < $2
+  `;
+
+  const payoutAllTimeQuery = `
+    SELECT COALESCE(SUM(allocated_amount), 0) AS total_payouts
+    FROM location_pay_allocations
+  `;
+
+  const payoutWeekQuery = `
+    SELECT COALESCE(SUM(allocated_amount), 0) AS total_payouts
+    FROM location_pay_allocations
+    WHERE week_start_date = $1
+  `;
+
+  const perLocationWeekQuery = `
+    SELECT
+      sr.location_id,
+      COALESCE(l.name, 'Unassigned') AS location_name,
+      CASE
+        WHEN DATE(sr.shift_date) >= $1 AND DATE(sr.shift_date) < $2 THEN 'current'
+        ELSE 'previous'
+      END AS bucket,
+      COUNT(*)::int AS report_count,
+      COALESCE(SUM(sr.hours), 0) AS total_hours,
+      COALESCE(SUM(sr.cars), 0) AS total_cars,
+      COALESCE(SUM(sr.cash_tips), 0) AS total_cash,
+      COALESCE(SUM(sr.online_tips), 0) AS total_online
+    FROM shift_reports sr
+    LEFT JOIN locations l ON l.id = sr.location_id
+    WHERE (DATE(sr.shift_date) >= $1 AND DATE(sr.shift_date) < $2)
+       OR (DATE(sr.shift_date) >= $3 AND DATE(sr.shift_date) < $4)
+    GROUP BY sr.location_id, l.name, bucket
+  `;
+
+  Promise.all([
+    db.query(allTimeQuery),
+    db.query(weeklyQuery, [weekStartDate, weekEndDate]),
+    db.query(weeklyQuery, [previousWeekStartDate, previousWeekEndDate]),
+    db.query(payoutAllTimeQuery),
+    db.query(payoutWeekQuery, [weekStartDate]),
+    db.query(payoutWeekQuery, [previousWeekStartDate]),
+    db.query(perLocationWeekQuery, [weekStartDate, weekEndDate, previousWeekStartDate, previousWeekEndDate])
+  ])
+    .then(([allTimeRes, currentRes, prevRes, payoutAllRes, payoutCurrentRes, payoutPrevRes, perLocationRes]) => {
+      const allTime = allTimeRes.rows[0] || {};
+      const current = currentRes.rows[0] || {};
+      const previous = prevRes.rows[0] || {};
+      const currentMoney = (Number(current.total_cash) || 0) + (Number(current.total_online) || 0);
+      const previousMoney = (Number(previous.total_cash) || 0) + (Number(previous.total_online) || 0);
+      const currentPayouts = Number((payoutCurrentRes.rows[0] || {}).total_payouts) || 0;
+      const previousPayouts = Number((payoutPrevRes.rows[0] || {}).total_payouts) || 0;
+      const allTimeMoney = (Number(allTime.total_cash) || 0) + (Number(allTime.total_online) || 0);
+      const allTimePayouts = Number((payoutAllRes.rows[0] || {}).total_payouts) || 0;
+
+      const overall = {
+        reportCount: Number(allTime.report_count) || 0,
+        totalHours: Number(allTime.total_hours) || 0,
+        totalCars: Number(allTime.total_cars) || 0,
+        totalCash: Number(allTime.total_cash) || 0,
+        totalOnline: Number(allTime.total_online) || 0,
+        totalMoney: allTimeMoney,
+        totalPayouts: allTimePayouts,
+        avgMoneyPerReport: (Number(allTime.report_count) || 0) > 0 ? allTimeMoney / Number(allTime.report_count) : 0
+      };
+
+      const weekly = {
+        current: {
+          reportCount: Number(current.report_count) || 0,
+          totalHours: Number(current.total_hours) || 0,
+          totalCars: Number(current.total_cars) || 0,
+          totalCash: Number(current.total_cash) || 0,
+          totalOnline: Number(current.total_online) || 0,
+          totalMoney: currentMoney,
+          totalPayouts: currentPayouts
+        },
+        previous: {
+          reportCount: Number(previous.report_count) || 0,
+          totalHours: Number(previous.total_hours) || 0,
+          totalCars: Number(previous.total_cars) || 0,
+          totalCash: Number(previous.total_cash) || 0,
+          totalOnline: Number(previous.total_online) || 0,
+          totalMoney: previousMoney,
+          totalPayouts: previousPayouts
+        }
+      };
+      weekly.current.moneyPerHour = weekly.current.totalHours > 0 ? weekly.current.totalMoney / weekly.current.totalHours : 0;
+      weekly.previous.moneyPerHour = weekly.previous.totalHours > 0 ? weekly.previous.totalMoney / weekly.previous.totalHours : 0;
+
+      const changes = {
+        reportCountPct: calculatePercentChange(weekly.current.reportCount, weekly.previous.reportCount),
+        totalHoursPct: calculatePercentChange(weekly.current.totalHours, weekly.previous.totalHours),
+        totalCarsPct: calculatePercentChange(weekly.current.totalCars, weekly.previous.totalCars),
+        totalMoneyPct: calculatePercentChange(weekly.current.totalMoney, weekly.previous.totalMoney),
+        totalPayoutsPct: calculatePercentChange(weekly.current.totalPayouts, weekly.previous.totalPayouts),
+        moneyPerHourPct: calculatePercentChange(weekly.current.moneyPerHour, weekly.previous.moneyPerHour)
+      };
+
+      const perLocationMap = new Map();
+      perLocationRes.rows.forEach((row) => {
+        const key = row.location_id ? String(row.location_id) : 'unassigned';
+        if (!perLocationMap.has(key)) {
+          perLocationMap.set(key, {
+            locationId: row.location_id,
+            locationName: row.location_name,
+            current: { reportCount: 0, totalHours: 0, totalCars: 0, totalCash: 0, totalOnline: 0, totalMoney: 0 },
+            previous: { reportCount: 0, totalHours: 0, totalCars: 0, totalCash: 0, totalOnline: 0, totalMoney: 0 }
+          });
+        }
+        const target = row.bucket === 'current' ? perLocationMap.get(key).current : perLocationMap.get(key).previous;
+        target.reportCount = Number(row.report_count) || 0;
+        target.totalHours = Number(row.total_hours) || 0;
+        target.totalCars = Number(row.total_cars) || 0;
+        target.totalCash = Number(row.total_cash) || 0;
+        target.totalOnline = Number(row.total_online) || 0;
+        target.totalMoney = target.totalCash + target.totalOnline;
+      });
+
+      const perLocation = Array.from(perLocationMap.values())
+        .map((loc) => ({
+          ...loc,
+          growth: {
+            reportsPct: calculatePercentChange(loc.current.reportCount, loc.previous.reportCount),
+            hoursPct: calculatePercentChange(loc.current.totalHours, loc.previous.totalHours),
+            carsPct: calculatePercentChange(loc.current.totalCars, loc.previous.totalCars),
+            moneyPct: calculatePercentChange(loc.current.totalMoney, loc.previous.totalMoney)
+          }
+        }))
+        .sort((a, b) => b.current.totalMoney - a.current.totalMoney);
+
+      res.render('admin_analytics', {
+        view,
+        weekStart,
+        weekDisplayEnd,
+        weekStartDate,
+        previousWeekStartDate,
+        nextWeekStartDate,
+        overall,
+        weekly,
+        changes,
+        perLocation
+      });
+    })
     .catch((err) => res.send('Error loading analytics: ' + err.message));
 });
 
@@ -1360,9 +1696,15 @@ app.get('/admin/leaderboard', requireAdmin, (req, res) => {
   if (!allowedSortColumns.includes(sort)) sort = 'total_hours';
   if (order !== 'asc' && order !== 'desc') order = 'desc';
 
+  const { weekStart, weekEnd, weekStartDate, weekEndDate } = getRequestedWeekRange(req.query.week_start);
+  const weekDisplayEnd = new Date(weekEnd);
+  weekDisplayEnd.setDate(weekDisplayEnd.getDate() - 1);
+  const previousWeekStartDate = addDaysToIsoDate(weekStartDate, -7);
+  const nextWeekStartDate = addDaysToIsoDate(weekStartDate, 7);
+
   const locationFilter = req.query.location_id;
   let query = '';
-  let params = [];
+  let params = [weekStartDate, weekEndDate];
 
   if (locationFilter) {
     query = `
@@ -1372,12 +1714,16 @@ app.get('/admin/leaderboard', requireAdmin, (req, res) => {
         COALESCE(SUM(sr.cash_tips), 0) AS total_cash,
         COALESCE(SUM(sr.online_tips) + SUM(sr.cash_tips), 0) AS total_tips
       FROM users u
-      LEFT JOIN shift_reports sr ON sr.user_id = u.id AND sr.location_id = $1
+      LEFT JOIN shift_reports sr
+        ON sr.user_id = u.id
+       AND DATE(sr.shift_date) >= $1
+       AND DATE(sr.shift_date) < $2
+       AND sr.location_id = $3
       WHERE u.role = 'valet'
       GROUP BY u.id
       ORDER BY ${sort} ${order}
     `;
-    params.push(locationFilter);
+    params.push(Number(locationFilter));
   } else {
     query = `
       SELECT u.id, u.name, u.phone,
@@ -1386,7 +1732,10 @@ app.get('/admin/leaderboard', requireAdmin, (req, res) => {
         COALESCE(SUM(sr.cash_tips), 0) AS total_cash,
         COALESCE(SUM(sr.online_tips) + SUM(sr.cash_tips), 0) AS total_tips
       FROM users u
-      LEFT JOIN shift_reports sr ON sr.user_id = u.id
+      LEFT JOIN shift_reports sr
+        ON sr.user_id = u.id
+       AND DATE(sr.shift_date) >= $1
+       AND DATE(sr.shift_date) < $2
       WHERE u.role = 'valet'
       GROUP BY u.id
       ORDER BY ${sort} ${order}
@@ -1402,7 +1751,12 @@ app.get('/admin/leaderboard', requireAdmin, (req, res) => {
           sort,
           order,
           locations,
-          selectedLocation: locationFilter
+          selectedLocation: locationFilter,
+          weekStart,
+          weekDisplayEnd,
+          weekStartDate,
+          previousWeekStartDate,
+          nextWeekStartDate
         })
       );
     })
