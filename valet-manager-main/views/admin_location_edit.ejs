@@ -61,19 +61,27 @@
       <thead>
         <tr>
           <th>Name</th>
+          <th>Lead trained</th>
           <th>Action</th>
         </tr>
       </thead>
       <tbody>
         <% if (!rosterMembers.length) { %>
           <tr>
-            <td colspan="2" class="muted">No trained valets assigned yet.</td>
+            <td colspan="3" class="muted">No trained valets assigned yet.</td>
           </tr>
         <% } %>
         <% rosterMembers.forEach(member => { %>
           <tr>
             <td><%= member.name %></td>
             <td>
+              <span class="pill"><%= member.lead_trained ? 'Yes' : 'No' %></span>
+            </td>
+            <td>
+              <form action="/admin/locations/<%= location.id %>/roster/lead/<%= member.id %>" method="POST" class="inline-form">
+                <input type="hidden" name="lead_trained" value="<%= member.lead_trained ? 'false' : 'true' %>">
+                <button type="submit" class="btn btn-ghost"><%= member.lead_trained ? 'Unmark Lead' : 'Mark Lead' %></button>
+              </form>
               <form action="/admin/locations/<%= location.id %>/roster/remove/<%= member.id %>" method="POST" class="inline-form">
                 <button type="submit" class="btn btn-ghost">Remove</button>
               </form>
@@ -82,6 +90,17 @@
         <% }) %>
       </tbody>
     </table>
+  </div>
+
+  <h4>Lead Trained List</h4>
+  <div class="row-actions">
+    <% const leadTrained = rosterMembers.filter(member => member.lead_trained); %>
+    <% if (!leadTrained.length) { %>
+      <span class="muted">No lead-trained valets marked yet.</span>
+    <% } %>
+    <% leadTrained.forEach(member => { %>
+      <span class="pill"><%= member.name %></span>
+    <% }) %>
   </div>
 </section>
 

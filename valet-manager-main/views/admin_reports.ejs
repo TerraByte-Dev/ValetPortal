@@ -49,6 +49,7 @@
     <span>Date</span>
     <span>Location</span>
     <span>Valet</span>
+    <span>Role</span>
     <span>Cash</span>
     <span>Digital</span>
   </div>
@@ -61,6 +62,7 @@
         <span><%= formatEstDate(report.shift_date) %></span>
         <span><%= report.location_name || 'Unassigned' %></span>
         <span><%= report.valet_name %> <% if (report.shift_notes) { %><span class="note-flag" title="Has shift notes">!</span><% } %></span>
+        <span><%= report.shift_role === 'lead_closer' ? 'Lead/Closer' : 'Runner' %></span>
         <span>$<%= Number(report.cash_tips || 0).toFixed(2) %></span>
         <span>$<%= Number(report.online_tips || 0).toFixed(2) %></span>
       </a>

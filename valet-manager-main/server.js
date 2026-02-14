@@ -131,6 +131,11 @@ function calculatePercentChange(current, previous) {
   return ((curr - prev) / prev) * 100;
 }
 
+function normalizeShiftRole(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized === 'lead_closer' ? 'lead_closer' : 'runner';
+}
+
 function todayEstIsoDate() {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
@@ -293,19 +298,21 @@ app.get('/dashboard', requireLogin, (req, res) => {
 });
 
 app.post('/dashboard', requireLogin, upload.array('screenshots', 10), (req, res) => {
-  const { shift_date, hours, online_tips, cash_tips, location_id, cars, shift_notes } = req.body;
+  const { shift_date, hours, online_tips, cash_tips, location_id, cars, shift_notes, shift_role } = req.body;
   if (!shift_date || online_tips === undefined || cash_tips === undefined || !location_id) {
     return res.render('dashboard', { error: 'All fields are required', message: null, locations: [] });
   }
   const hoursValue = hours ? Number(hours) : 0;
   const carsValue = cars ? Number(cars) : 0;
+  const shiftRole = normalizeShiftRole(shift_role);
   const insertQuery = `
-    INSERT INTO shift_reports (user_id, shift_date, hours, online_tips, cash_tips, location_id, cars, shift_notes)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id
+    INSERT INTO shift_reports (user_id, shift_date, shift_role, hours, online_tips, cash_tips, location_id, cars, shift_notes)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id
   `;
   db.query(insertQuery, [
     req.session.user.id,
     shift_date,
+    shiftRole,
     hoursValue,
     online_tips,
     cash_tips,
@@ -693,7 +700,7 @@ app.get('/admin/reports', requireAdmin, (req, res) => {
   const orderBy = sortMap[sort] || sortMap.recent;
 
   let query = `
-    SELECT sr.id, sr.shift_date, sr.online_tips, sr.cash_tips, sr.shift_notes,
+    SELECT sr.id, sr.shift_date, sr.shift_role, sr.online_tips, sr.cash_tips, sr.shift_notes,
            u.name AS valet_name, l.name AS location_name
     FROM shift_reports sr
     JOIN users u ON sr.user_id = u.id
@@ -777,13 +784,14 @@ app.get('/admin/edit/:id', requireAdmin, (req, res) => {
 
 app.post('/admin/edit/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
-  const { shift_date, hours, cars, online_tips, cash_tips, shift_notes } = req.body;
+  const { shift_date, shift_role, hours, cars, online_tips, cash_tips, shift_notes } = req.body;
+  const shiftRole = normalizeShiftRole(shift_role);
   const updateQuery = `
     UPDATE shift_reports
-    SET shift_date = $1, hours = $2, cars = $3, online_tips = $4, cash_tips = $5, shift_notes = $6
-    WHERE id = $7
+    SET shift_date = $1, shift_role = $2, hours = $3, cars = $4, online_tips = $5, cash_tips = $6, shift_notes = $7
+    WHERE id = $8
   `;
-  db.query(updateQuery, [shift_date, hours, cars, online_tips, cash_tips, shift_notes || null, id])
+  db.query(updateQuery, [shift_date, shiftRole, hours, cars, online_tips, cash_tips, shift_notes || null, id])
     .then(() => res.redirect('/admin/reports'))
     .catch((err) => res.send('Error updating shift report: ' + err.message));
 });
@@ -813,6 +821,7 @@ app.get('/admin/export', requireAdmin, (req, res) => {
           { id: 'name', title: 'Name' },
           { id: 'phone', title: 'Phone' },
           { id: 'shift_date', title: 'Shift Date' },
+          { id: 'shift_role', title: 'Role' },
           { id: 'hours', title: 'Hours' },
           { id: 'cars', title: '# of Cars' },
           { id: 'online_tips', title: 'Online Payments' },
@@ -835,7 +844,9 @@ app.get('/admin/locations', requireAdmin, (req, res) => {
   const error = req.query.error || null;
   db.query(
     `
-      SELECT l.id, l.name, l.lot_fee, COALESCE(COUNT(lr.user_id), 0)::int AS roster_count
+      SELECT l.id, l.name, l.lot_fee,
+             COALESCE(COUNT(lr.user_id), 0)::int AS roster_count,
+             COALESCE(SUM(CASE WHEN lr.lead_trained IS TRUE THEN 1 ELSE 0 END), 0)::int AS lead_count
       FROM locations l
       LEFT JOIN location_rosters lr ON lr.location_id = l.id
       GROUP BY l.id
@@ -898,7 +909,7 @@ app.get('/admin/locations/:id/edit', requireAdmin, (req, res) => {
     db.query('SELECT * FROM locations WHERE id = $1', [id]),
     db.query(
       `
-        SELECT u.id, u.name
+        SELECT u.id, u.name, lr.lead_trained
         FROM location_rosters lr
         JOIN users u ON u.id = lr.user_id
         WHERE lr.location_id = $1
@@ -968,6 +979,17 @@ app.post('/admin/locations/:id/roster/remove/:userId', requireAdmin, (req, res) 
   const { id, userId } = req.params;
   db.query('DELETE FROM location_rosters WHERE location_id = $1 AND user_id = $2', [id, userId])
     .then(() => res.redirect(`/admin/locations/${id}/edit?message=${encodeURIComponent('Roster updated.')}`))
+    .catch((err) => res.redirect(`/admin/locations/${id}/edit?error=${encodeURIComponent('Error updating roster: ' + err.message)}`));
+});
+
+app.post('/admin/locations/:id/roster/lead/:userId', requireAdmin, (req, res) => {
+  const { id, userId } = req.params;
+  const leadTrained = req.body.lead_trained === 'true';
+  db.query(
+    'UPDATE location_rosters SET lead_trained = $1 WHERE location_id = $2 AND user_id = $3',
+    [leadTrained, id, userId]
+  )
+    .then(() => res.redirect(`/admin/locations/${id}/edit?message=${encodeURIComponent('Roster training updated.')}`))
     .catch((err) => res.redirect(`/admin/locations/${id}/edit?error=${encodeURIComponent('Error updating roster: ' + err.message)}`));
 });
 
@@ -1627,7 +1649,7 @@ app.get('/admin/valet-submission', requireAdmin, (req, res) => {
 });
 
 app.post('/admin/valet-submission', requireAdmin, upload.array('screenshots', 10), (req, res) => {
-  const { shift_date, hours, online_tips, cash_tips, location_id, cars, valet_id, shift_notes } = req.body;
+  const { shift_date, shift_role, hours, online_tips, cash_tips, location_id, cars, valet_id, shift_notes } = req.body;
   if (!shift_date || online_tips === undefined || cash_tips === undefined || !location_id || !valet_id) {
     return Promise.all([
       db.query('SELECT * FROM locations ORDER BY name ASC'),
@@ -1643,13 +1665,15 @@ app.post('/admin/valet-submission', requireAdmin, upload.array('screenshots', 10
   }
   const hoursValue = hours ? Number(hours) : 0;
   const carsValue = cars ? Number(cars) : 0;
+  const shiftRole = normalizeShiftRole(shift_role);
   const insertQuery = `
-    INSERT INTO shift_reports (user_id, shift_date, hours, online_tips, cash_tips, location_id, cars, shift_notes)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id
+    INSERT INTO shift_reports (user_id, shift_date, shift_role, hours, online_tips, cash_tips, location_id, cars, shift_notes)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id
   `;
   db.query(insertQuery, [
     valet_id,
     shift_date,
+    shiftRole,
     hoursValue,
     online_tips,
     cash_tips,
@@ -2103,7 +2127,7 @@ app.get('/admin/export-weekly', requireAdmin, (req, res) => {
       });
 
       let csvLines = [];
-      csvLines.push('ID,Valet Name,Phone,Shift Date,Hours,# of Cars,Online Tips,Cash Tips,Total,Location');
+      csvLines.push('ID,Valet Name,Phone,Shift Date,Role,Hours,# of Cars,Online Tips,Cash Tips,Total,Location');
       for (const [locName, reportsForLoc] of locationMap.entries()) {
         csvLines.push(`Location: ${locName}`);
         const groupedByWeek = groupReportsByWeek(reportsForLoc);
@@ -2116,6 +2140,7 @@ app.get('/admin/export-weekly', requireAdmin, (req, res) => {
               `"${r.valet_name}"`,
               r.phone,
               r.shift_date,
+              r.shift_role || 'runner',
               r.hours,
               r.cars,
               r.online_tips,

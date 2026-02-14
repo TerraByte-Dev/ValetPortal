@@ -26,6 +26,10 @@
       <strong><%= report.hours %></strong>
     </div>
     <div>
+      <span class="muted">Role</span>
+      <strong><%= report.shift_role === 'lead_closer' ? 'Lead/Closer' : 'Runner' %></strong>
+    </div>
+    <div>
       <span class="muted">Cars</span>
       <strong><%= report.cars %></strong>
     </div>

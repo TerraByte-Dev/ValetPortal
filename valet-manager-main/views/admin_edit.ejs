@@ -28,6 +28,13 @@
         <input type="number" name="cars" id="cars" value="<%= report.cars %>" required>
       </div>
       <div class="form-group">
+        <label for="shift_role">Role</label>
+        <select name="shift_role" id="shift_role">
+          <option value="runner" <%= report.shift_role === 'runner' ? 'selected' : '' %>>Runner</option>
+          <option value="lead_closer" <%= report.shift_role === 'lead_closer' ? 'selected' : '' %>>Lead/Closer</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label for="online_tips">Digital value</label>
         <input type="number" step="0.01" name="online_tips" id="online_tips" value="<%= report.online_tips %>" required>
       </div>

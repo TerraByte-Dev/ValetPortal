@@ -64,6 +64,7 @@ async function waitForDbAndCreateTables(maxRetries = 15, baseDelayMs = 700) {
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id),
       shift_date TIMESTAMP WITH TIME ZONE NOT NULL,
+      shift_role TEXT NOT NULL DEFAULT 'runner',
       hours REAL NOT NULL,
       online_tips REAL NOT NULL DEFAULT 0,
       cash_tips REAL NOT NULL DEFAULT 0,
@@ -100,6 +101,7 @@ async function waitForDbAndCreateTables(maxRetries = 15, baseDelayMs = 700) {
       id SERIAL PRIMARY KEY,
       location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      lead_trained BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE (location_id, user_id)
     );
@@ -142,6 +144,8 @@ async function waitForDbAndCreateTables(maxRetries = 15, baseDelayMs = 700) {
       await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS links TEXT`);
       await pool.query(`ALTER TABLE locations ADD COLUMN IF NOT EXISTS lot_fee REAL NOT NULL DEFAULT 0`);
       await pool.query(`ALTER TABLE shift_reports ADD COLUMN IF NOT EXISTS shift_notes TEXT`);
+      await pool.query(`ALTER TABLE shift_reports ADD COLUMN IF NOT EXISTS shift_role TEXT NOT NULL DEFAULT 'runner'`);
+      await pool.query(`UPDATE shift_reports SET shift_role = 'runner' WHERE shift_role IS NULL`);
       await pool.query(`ALTER TABLE community_messages ADD COLUMN IF NOT EXISTS parent_message_id INTEGER`);
       await pool.query(`ALTER TABLE community_messages DROP CONSTRAINT IF EXISTS community_messages_parent_message_id_fkey`);
       await pool.query(
@@ -154,6 +158,8 @@ async function waitForDbAndCreateTables(maxRetries = 15, baseDelayMs = 700) {
 
       await pool.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS visible_in_sidebar BOOLEAN DEFAULT TRUE`);
       await pool.query(`UPDATE groups SET visible_in_sidebar = TRUE WHERE visible_in_sidebar IS NULL`);
+      await pool.query(`ALTER TABLE location_rosters ADD COLUMN IF NOT EXISTS lead_trained BOOLEAN NOT NULL DEFAULT FALSE`);
+      await pool.query(`UPDATE location_rosters SET lead_trained = FALSE WHERE lead_trained IS NULL`);
 
       await pool.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_group_id_fkey`);
       await pool.query(
