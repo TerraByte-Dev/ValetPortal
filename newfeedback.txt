@@ -1,5 +1,2 @@
-I dont know how to handle this specific use case... Basically not everyone at a location would be submitting money every shift, only the shift closer (because they are the person bringing home the cash). This would mean some valets wouldnt even be eligible for the top valet $ spot... Im drawing a blank as to how to move forward with this information... 
-Maybe have different shift report submissions based on role? So by default , it wouldnt include cash 
-
-Wait. I think I know what to do. Just add a "Role" field in submisison, options of Lead/Closer and Runner. No input fields are changed, we just arent really expecting to see money inputs by runners, but we allow them to fill the fields out regardless, in case they do have money to report. 
-This change may need to affect other data tables, and under locations maybe on the roster have a "Lead Trained" list too? 
+The more responsible lead/closer are a bit smarter, so I think to keep it easy on the runner valets, dont show cars handles, or payment screenshots. Payment screenshots, cars handled, should only be viewable by a Lead/Closer variation of the submisison.
+If cash value and or digital value are empty, just assume 0, instead of requiring input for submission.

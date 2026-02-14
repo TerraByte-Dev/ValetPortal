@@ -136,6 +136,14 @@ function normalizeShiftRole(value) {
   return normalized === 'lead_closer' ? 'lead_closer' : 'runner';
 }
 
+function parseNumberOrZero(value) {
+  if (value === undefined || value === null) return 0;
+  const trimmed = String(value).trim();
+  if (!trimmed) return 0;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function todayEstIsoDate() {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
@@ -299,12 +307,16 @@ app.get('/dashboard', requireLogin, (req, res) => {
 
 app.post('/dashboard', requireLogin, upload.array('screenshots', 10), (req, res) => {
   const { shift_date, hours, online_tips, cash_tips, location_id, cars, shift_notes, shift_role } = req.body;
-  if (!shift_date || online_tips === undefined || cash_tips === undefined || !location_id) {
-    return res.render('dashboard', { error: 'All fields are required', message: null, locations: [] });
+  if (!shift_date || !location_id) {
+    return res.render('dashboard', { error: 'Shift date and location are required', message: null, locations: [] });
   }
-  const hoursValue = hours ? Number(hours) : 0;
-  const carsValue = cars ? Number(cars) : 0;
   const shiftRole = normalizeShiftRole(shift_role);
+  const isLeadCloser = shiftRole === 'lead_closer';
+  const hoursValue = parseNumberOrZero(hours);
+  const onlineTipsValue = parseNumberOrZero(online_tips);
+  const cashTipsValue = parseNumberOrZero(cash_tips);
+  const carsValue = isLeadCloser ? parseNumberOrZero(cars) : 0;
+  const uploadedFiles = isLeadCloser ? req.files || [] : [];
   const insertQuery = `
     INSERT INTO shift_reports (user_id, shift_date, shift_role, hours, online_tips, cash_tips, location_id, cars, shift_notes)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id
@@ -314,16 +326,16 @@ app.post('/dashboard', requireLogin, upload.array('screenshots', 10), (req, res)
     shift_date,
     shiftRole,
     hoursValue,
-    online_tips,
-    cash_tips,
+    onlineTipsValue,
+    cashTipsValue,
     location_id,
     carsValue,
     shift_notes ? String(shift_notes).trim() : null
   ])
     .then((result) => {
       const shiftReportId = result.rows[0].id;
-      if (req.files && req.files.length > 0) {
-        const promises = req.files.map((file) =>
+      if (uploadedFiles.length > 0) {
+        const promises = uploadedFiles.map((file) =>
           db.query('INSERT INTO shift_screenshots (shift_report_id, file_path) VALUES ($1, $2)', [
             shiftReportId,
             file.filename
@@ -1650,7 +1662,7 @@ app.get('/admin/valet-submission', requireAdmin, (req, res) => {
 
 app.post('/admin/valet-submission', requireAdmin, upload.array('screenshots', 10), (req, res) => {
   const { shift_date, shift_role, hours, online_tips, cash_tips, location_id, cars, valet_id, shift_notes } = req.body;
-  if (!shift_date || online_tips === undefined || cash_tips === undefined || !location_id || !valet_id) {
+  if (!shift_date || !location_id || !valet_id) {
     return Promise.all([
       db.query('SELECT * FROM locations ORDER BY name ASC'),
       db.query("SELECT id, name FROM users WHERE role = 'valet' ORDER BY name ASC")
@@ -1658,14 +1670,18 @@ app.post('/admin/valet-submission', requireAdmin, upload.array('screenshots', 10
       res.render('admin_valet_submit', {
         locations: locations.rows,
         valets: valets.rows,
-        error: 'All fields are required.',
+        error: 'Valet, shift date, and location are required.',
         message: null
       })
     );
   }
-  const hoursValue = hours ? Number(hours) : 0;
-  const carsValue = cars ? Number(cars) : 0;
   const shiftRole = normalizeShiftRole(shift_role);
+  const isLeadCloser = shiftRole === 'lead_closer';
+  const hoursValue = parseNumberOrZero(hours);
+  const onlineTipsValue = parseNumberOrZero(online_tips);
+  const cashTipsValue = parseNumberOrZero(cash_tips);
+  const carsValue = isLeadCloser ? parseNumberOrZero(cars) : 0;
+  const uploadedFiles = isLeadCloser ? req.files || [] : [];
   const insertQuery = `
     INSERT INTO shift_reports (user_id, shift_date, shift_role, hours, online_tips, cash_tips, location_id, cars, shift_notes)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id
@@ -1675,16 +1691,16 @@ app.post('/admin/valet-submission', requireAdmin, upload.array('screenshots', 10
     shift_date,
     shiftRole,
     hoursValue,
-    online_tips,
-    cash_tips,
+    onlineTipsValue,
+    cashTipsValue,
     location_id,
     carsValue,
     shift_notes ? String(shift_notes).trim() : null
   ])
     .then((result) => {
       const shiftReportId = result.rows[0].id;
-      if (req.files && req.files.length > 0) {
-        const promises = req.files.map((file) =>
+      if (uploadedFiles.length > 0) {
+        const promises = uploadedFiles.map((file) =>
           db.query('INSERT INTO shift_screenshots (shift_report_id, file_path) VALUES ($1, $2)', [
             shiftReportId,
             file.filename

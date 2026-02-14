@@ -3,7 +3,7 @@
   <div>
     <p class="eyebrow">Admin valet submission</p>
     <h2>Submit a shift report</h2>
-    <p class="muted">Admins can submit reports on behalf of a valet.</p>
+    <p class="muted">Admins can submit reports on behalf of a valet. Cars and screenshots are only for Lead/Closer submissions.</p>
   </div>
   <div class="button-row">
     <a href="/admin/reports" class="btn btn-ghost">View reports</a>
@@ -57,15 +57,15 @@
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label for="cash_tips">Cash value</label>
-        <input type="number" step="0.01" id="cash_tips" name="cash_tips" required>
+        <label for="cash_tips">Cash value (optional)</label>
+        <input type="number" step="0.01" id="cash_tips" name="cash_tips" placeholder="0.00">
       </div>
       <div class="form-group">
-        <label for="online_tips">Digital value</label>
-        <input type="number" step="0.01" id="online_tips" name="online_tips" required>
+        <label for="online_tips">Digital value (optional)</label>
+        <input type="number" step="0.01" id="online_tips" name="online_tips" placeholder="0.00">
       </div>
     </div>
-    <div class="form-row">
+    <div class="form-row" data-lead-only>
       <div class="form-group">
         <label for="cars">Cars handled (optional)</label>
         <input type="number" id="cars" name="cars" placeholder="0">
@@ -84,4 +84,31 @@
     </div>
   </form>
 </section>
+<script>
+  (function () {
+    const roleSelect = document.getElementById('shift_role');
+    const leadOnlySections = document.querySelectorAll('[data-lead-only]');
+    const carsInput = document.getElementById('cars');
+    const screenshotsInput = document.getElementById('screenshots');
+
+    function syncLeadOnlyFields() {
+      const isLeadCloser = roleSelect && roleSelect.value === 'lead_closer';
+      leadOnlySections.forEach((section) => {
+        section.style.display = isLeadCloser ? '' : 'none';
+        section.querySelectorAll('input, select, textarea').forEach((input) => {
+          input.disabled = !isLeadCloser;
+        });
+      });
+      if (!isLeadCloser) {
+        if (carsInput) carsInput.value = '';
+        if (screenshotsInput) screenshotsInput.value = '';
+      }
+    }
+
+    if (roleSelect) {
+      roleSelect.addEventListener('change', syncLeadOnlyFields);
+      syncLeadOnlyFields();
+    }
+  })();
+</script>
 <%- include('partials/footer') %>
