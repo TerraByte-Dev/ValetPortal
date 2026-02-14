@@ -144,6 +144,10 @@ function parseNumberOrZero(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+}
+
 function todayEstIsoDate() {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
@@ -222,7 +226,26 @@ app.get('/', (req, res) => {
 });
 
 app.get('/about', (req, res) => {
-  res.render('about');
+  res.render('about', {
+    pricingMessage: req.query.pricing_message || null,
+    pricingError: req.query.pricing_error || null
+  });
+});
+
+app.post('/about/pricing-interest', (req, res) => {
+  const plan = String(req.body.plan || '').trim();
+  const contactEmail = String(req.body.contact_email || '').trim();
+  if (!plan) {
+    return res.redirect('/about?pricing_error=' + encodeURIComponent('Select a plan before submitting.'));
+  }
+  if (!isValidEmail(contactEmail)) {
+    return res.redirect('/about?pricing_error=' + encodeURIComponent('Enter a valid contact email.'));
+  }
+  console.log(`[Pricing inquiry] plan=${plan} contact_email=${contactEmail}`);
+  return res.redirect(
+    '/about?pricing_message=' +
+      encodeURIComponent(`Sales intake recorded for ${contactEmail}. We will follow up on the ${plan} plan.`)
+  );
 });
 
 // Register
@@ -280,6 +303,7 @@ app.post('/login', (req, res) => {
     .then(async (result) => {
       if (result.rowCount === 0) return res.render('login', { error: 'Invalid credentials' });
       const user = result.rows[0];
+      if (user.role === 'archived') return res.render('login', { error: 'Invalid credentials' });
       const match = await bcrypt.compare(normalizedPin, user.password);
       if (!match) return res.render('login', { error: 'Invalid credentials' });
       req.session.user = user;
@@ -1197,6 +1221,7 @@ async function loadUsersAndGroups() {
       SELECT u.*, g.name AS group_name
       FROM users u
       LEFT JOIN groups g ON u.group_id = g.id
+      WHERE u.role <> 'archived'
       ORDER BY u.role DESC, u.name ASC
     `),
     db.query('SELECT * FROM groups ORDER BY name ASC')
@@ -1252,7 +1277,7 @@ app.post('/admin/users', requireAdmin, async (req, res) => {
 app.get('/admin/users/edit/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
   Promise.all([
-    db.query('SELECT * FROM users WHERE id = $1', [id]),
+    db.query("SELECT * FROM users WHERE id = $1 AND role <> 'archived'", [id]),
     db.query('SELECT * FROM groups ORDER BY name ASC')
   ])
     .then(([user, groups]) => {
@@ -1268,7 +1293,7 @@ app.post('/admin/users/edit/:id', requireAdmin, async (req, res) => {
   const normalizedPin = normalizePinInput(pin);
   if (normalizedPin && !isValidPin(normalizedPin)) {
     return Promise.all([
-      db.query('SELECT * FROM users WHERE id = $1', [id]),
+      db.query("SELECT * FROM users WHERE id = $1 AND role <> 'archived'", [id]),
       db.query('SELECT * FROM groups ORDER BY name ASC')
     ])
       .then(([user, groups]) => {
@@ -1328,28 +1353,36 @@ app.post('/admin/users/:id/pin', requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/admin/users/pin-reset-all', requireAdmin, async (req, res) => {
-  try {
-    const defaultPin = '0000';
-    const hashedPin = await bcrypt.hash(defaultPin, 10);
-    const result = await db.query('UPDATE users SET password = $1', [hashedPin]);
-    await renderAdminUsersPage(res, null, `Reset PIN to 0000 for ${result.rowCount} users.`);
-    return;
-  } catch (err) {
-    return res.send('Error resetting PINs: ' + err.message);
-  }
-});
-
 app.post('/admin/users/delete/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
-  const { confirm_text } = req.body;
-  if (confirm_text !== 'DELETE') {
+  const confirmText = String(req.body.confirm_text || '').trim().toUpperCase();
+  if (confirmText !== 'DELETE') {
     return renderAdminUsersPage(res, 'Type DELETE to confirm user removal.')
       .catch((err) => res.send('Error retrieving users: ' + err.message));
   }
-  db.query('DELETE FROM users WHERE id = $1', [id])
-    .then(() => res.redirect('/admin/users'))
-    .catch((err) => res.send('Error deleting user: ' + err.message));
+  if (Number(id) === Number(req.session.user.id)) {
+    return renderAdminUsersPage(res, 'You cannot remove the currently signed-in account.')
+      .catch((err) => res.send('Error retrieving users: ' + err.message));
+  }
+  db.query(
+    `
+      UPDATE users
+      SET role = 'archived',
+          group_id = NULL
+      WHERE id = $1
+        AND role <> 'archived'
+    `,
+    [id]
+  )
+    .then((result) => {
+      if (!result.rowCount) {
+        return renderAdminUsersPage(res, 'User not found.')
+          .catch((err) => res.send('Error retrieving users: ' + err.message));
+      }
+      return renderAdminUsersPage(res, null, 'User removed.')
+        .catch((err) => res.send('Error retrieving users: ' + err.message));
+    })
+    .catch((err) => res.send('Error removing user: ' + err.message));
 });
 
 /* ------------------------------

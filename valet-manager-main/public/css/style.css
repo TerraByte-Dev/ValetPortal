@@ -701,6 +701,7 @@ p {
   justify-content: center;
   gap: 0.4rem;
   cursor: pointer;
+  color: #fff;
 }
 
 .btn-primary {
@@ -716,6 +717,12 @@ p {
 .btn-ghost {
   background: var(--surface);
   border: 1px solid var(--border);
+  color: var(--ink);
+}
+
+.btn-ghost:hover {
+  color: #fff;
+  border-color: var(--primary);
 }
 
 .btn-danger {

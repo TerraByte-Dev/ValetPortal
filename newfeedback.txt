@@ -1,2 +1,6 @@
-The more responsible lead/closer are a bit smarter, so I think to keep it easy on the runner valets, dont show cars handles, or payment screenshots. Payment screenshots, cars handled, should only be viewable by a Lead/Closer variation of the submisison.
-If cash value and or digital value are empty, just assume 0, instead of requiring input for submission.
+Okay, we are close to production. lets remove (optional) from everything, besides Shift Notes. 
+Lets change the header "Valet Management Portal" to "Team Portal" 
+Add functionality to the Pricing page under About, selecting pricing prompts them to enter a contact email for sales, as it isnt really set up for wide distrobution, but I want to leave it there and open the possibility for professionality.
+Remove "BULK PIN RESET" there is no need anymore.
+Deleting users doesnt seem to work in adminview, even when typing "DELETE" or "delete" -- say a user is deleted, it should NOT override all their reported data/shift reports. They just are no longer a user.
+buttons that use black text, need to have white text instead, because the black is hard to read.

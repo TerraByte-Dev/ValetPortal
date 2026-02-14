@@ -2,7 +2,7 @@
 <section class="page-header">
   <div>
     <p class="eyebrow">About</p>
-    <h2>Valet Management Portal</h2>
+    <h2>Team Portal</h2>
     <p class="muted">A clean, mobile-first workflow for shift reporting and team oversight.</p>
   </div>
 </section>
@@ -36,7 +36,13 @@
 
 <section class="card">
   <h3>Pricing (demo)</h3>
-  <p class="muted">Sample pricing for presentation only. Billing is not connected.</p>
+  <p class="muted">Sample pricing for presentation only. Select a plan to submit a contact email for sales follow-up.</p>
+  <% if (pricingError) { %>
+    <p class="alert alert-error"><%= pricingError %></p>
+  <% } %>
+  <% if (pricingMessage) { %>
+    <p class="alert alert-success"><%= pricingMessage %></p>
+  <% } %>
   <div class="pricing-grid">
     <div class="pricing-card">
       <h4>Starter</h4>
@@ -46,6 +52,9 @@
         <li>3 locations</li>
         <li>Basic analytics</li>
       </ul>
+      <div class="btn-row">
+        <button type="button" class="btn btn-ghost pricing-select-btn" data-plan="Starter">Select Starter</button>
+      </div>
     </div>
     <div class="pricing-card highlighted">
       <h4>Operations</h4>
@@ -55,6 +64,9 @@
         <li>Unlimited locations</li>
         <li>Advanced reporting</li>
       </ul>
+      <div class="btn-row">
+        <button type="button" class="btn btn-primary pricing-select-btn" data-plan="Operations">Select Operations</button>
+      </div>
     </div>
     <div class="pricing-card">
       <h4>Enterprise</h4>
@@ -64,7 +76,33 @@
         <li>Dedicated support</li>
         <li>Custom analytics</li>
       </ul>
+      <div class="btn-row">
+        <button type="button" class="btn btn-ghost pricing-select-btn" data-plan="Enterprise">Select Enterprise</button>
+      </div>
     </div>
   </div>
+  <form id="pricing-contact-form" action="/about/pricing-interest" method="POST" style="display:none;">
+    <input type="hidden" name="plan" id="pricing-plan-input">
+    <input type="hidden" name="contact_email" id="pricing-email-input">
+  </form>
 </section>
+<script>
+  (function () {
+    const buttons = document.querySelectorAll('.pricing-select-btn');
+    const form = document.getElementById('pricing-contact-form');
+    const planInput = document.getElementById('pricing-plan-input');
+    const emailInput = document.getElementById('pricing-email-input');
+    if (!buttons.length || !form || !planInput || !emailInput) return;
+    buttons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const plan = button.getAttribute('data-plan') || 'Selected';
+        const email = window.prompt(`Enter contact email for ${plan} sales follow-up:`);
+        if (!email) return;
+        planInput.value = plan;
+        emailInput.value = email.trim();
+        form.submit();
+      });
+    });
+  })();
+</script>
 <%- include('partials/footer') %>
